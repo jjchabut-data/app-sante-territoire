@@ -6,10 +6,11 @@ import numpy as np
 import pydeck as pdk
 from scipy.spatial import distance_matrix
 import plotly.graph_objects as go
+from library import config as cfg
+
 
 # ─── CONSTANTES ──────────────────────────────────────────────────────────────
 
-DATA_DIR = 'data'
 
 
 COLOR_MAP = {
@@ -337,63 +338,66 @@ span[data-baseweb="tag"] span {
 """, unsafe_allow_html=True)
 
 # ─── CHARGEMENT DONNÉES ──────────────────────────────────────────────────────
+from pathlib import Path
+
+DATA_DIR = cfg.DATA_DIR
 
 @st.cache_data
 def load_indicateurs():
-    return pd.read_parquet(f'{DATA_DIR}/score_sante_territoires_final.parquet')
+    return pd.read_parquet(DATA_DIR / 'score_sante_territoires_final.parquet')
 
 @st.cache_data
 def load_ref_territoires():
-    return pd.read_parquet(f'{DATA_DIR}/ref_app_territoires.parquet')
+    return pd.read_parquet(DATA_DIR / 'ref_app_territoires.parquet')
 
 @st.cache_data
 def load_geom_communes():
-    return gpd.read_parquet(f'{DATA_DIR}/app_communes_geom_simplified.parquet')
+    return gpd.read_parquet(DATA_DIR / 'app_communes_geom_simplified.parquet')
 
 @st.cache_data
 def load_geom_dept():
-    return gpd.read_parquet(f'{DATA_DIR}/departements_geom_simplified.parquet')
+    return gpd.read_parquet(DATA_DIR / 'departements_geom_simplified.parquet')
 
 @st.cache_data
 def load_geom_epci():
-    return gpd.read_parquet(f'{DATA_DIR}/epci_geom_simplified.parquet')
+    return gpd.read_parquet(DATA_DIR / 'epci_geom_simplified.parquet')
 
 @st.cache_data
 def load_geom_regions():
-    return gpd.read_parquet(f'{DATA_DIR}/regions_geom_simplified.parquet')
+    return gpd.read_parquet(DATA_DIR / 'regions_geom_simplified.parquet')
 
 @st.cache_data
 def load_geom_ze():
-    return gpd.read_parquet(f'{DATA_DIR}/zone_emploi_geom_simplified.parquet')
+    return gpd.read_parquet(DATA_DIR / 'zone_emploi_geom_simplified.parquet')
 
 @st.cache_data
 def load_clusters():
     """Charge les clusters pré-calculés (K-Means k=5, trié par score APL composite)."""
-    return pd.read_parquet(f'{DATA_DIR}/commune_clusters.parquet')
+    return pd.read_parquet(DATA_DIR / 'commune_clusters.parquet')
 
 @st.cache_data
 def load_ze_communes_mapping():
-    df = pd.read_parquet(f'{DATA_DIR}/zone_emploi_communes.parquet')
+    df = pd.read_parquet(DATA_DIR / 'zone_emploi_communes.parquet')
     return dict(zip(df['CODGEO'], df['ZE2020']))
 
 @st.cache_data
 def load_dept_centroids():
     """Centroides des départements pour le TextLayer."""
-    gdf = gpd.read_parquet(f'{DATA_DIR}/departements_geom_simplified.parquet')
+    gdf = gpd.read_parquet(DATA_DIR / 'departements_geom_simplified.parquet')
     return pd.DataFrame({'longitude': gdf['lon'], 'latitude': gdf['lat'], 'text': gdf['nom_officiel']})
 
 @st.cache_data
 def load_geom_iris(codes: tuple):
     """Contours IRIS pour les communes demandées (predicate pushdown)."""
     return gpd.read_parquet(
-        f'{DATA_DIR}/ref_iris_habitat_geom_simplified.parquet',
+        DATA_DIR / 'ref_iris_habitat_geom_simplified.parquet',
         filters=[('code_insee_comm', 'in', list(codes))],
     )
 
 @st.cache_data
 def load_fdep():
     """Indicateurs sociaux FDEP par IRIS."""
-    return pd.read_parquet(f'{DATA_DIR}/app_fdep_utile.parquet')
+    return pd.read_parquet(DATA_DIR / 'app_fdep_utile.parquet')
 
 # ─── CALCUL COMMUNES ─────────────────────────────────────────────────────────
 
