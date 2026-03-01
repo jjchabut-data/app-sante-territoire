@@ -6,7 +6,7 @@ import numpy as np
 import pydeck as pdk
 from scipy.spatial import distance_matrix
 import plotly.graph_objects as go
-from library import config as cfg
+from library.config import DATA_DIR
 
 
 # ─── CONSTANTES ──────────────────────────────────────────────────────────────
@@ -338,9 +338,7 @@ span[data-baseweb="tag"] span {
 """, unsafe_allow_html=True)
 
 # ─── CHARGEMENT DONNÉES ──────────────────────────────────────────────────────
-from pathlib import Path
 
-DATA_DIR = cfg.DATA_DIR
 
 @st.cache_data
 def load_indicateurs():
