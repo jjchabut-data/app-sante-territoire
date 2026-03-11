@@ -1,15 +1,20 @@
 import streamlit as st
-from utils import (
+from libapp.utils import (
     inject_css,
     load_indicateurs,
     load_ref_territoires,
     APL_COLS,
 )
+import libapp.profils as prf
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 
 st.set_page_config(page_title="Diagnostic Territorial Santé", page_icon="🩺", layout="wide")
 inject_css()
+
+# TO ACTIVATE profil = prf.choisir_profil()
+
+
 
 # ─── INIT SESSION STATE ───────────────────────────────────────────────────────
 
@@ -24,24 +29,24 @@ if "apl_nat_p95" not in st.session_state:
 
 # ─── PAGE ACCUEIL ─────────────────────────────────────────────────────────────
 
-st.title("🏥 Diagnostic Territorial de Santé Publique")
-st.markdown("""
-## Analysez l'accessibilité aux soins de votre territoire
+st.title("🏥 Diagnostic Territorial")
+st.markdown('''
+Identifiez les zones sous-dotées en soins sur votre territoire et comprenez les facteurs qui expliquent ces inégalités.
+''')
+st.markdown("---")
+st.markdown("#### Choisissez votre territoire pour commencer")
+st.page_link("pages/1_Diagnostic.py", 
+             label="Territoire 👈", 
+             )
+# profil = prf.choisir_profil()
+st.markdown("---")
 
-Cet outil permet de réaliser un diagnostic territorial de santé publique en quelques clics.
+st.markdown("#### Que contient cet outil ?")
+col1, col2, col3 = st.columns(3)
 
-### Fonctionnalités
-- Sélection par **commune** (rayon 0–50 km), **département**, **région**, **EPCI** ou **zone d'emploi**
-- Coloration thématique **Viridis** : Score APL, Score socio-sanitaire, Cluster, APL par profession
-- Couches optionnelles : contours département, contours IRIS
-- Radar multi-critères · Interprétation automatique
-
-### Utilisation
-1. Cliquez sur **🔧 Outil de Diagnostic**
-2. Choisissez un type de territoire et un territoire
-3. Sélectionnez la thématique et les options d'affichage
-4. Cliquez sur **Afficher**
-
----
-**Projet Open Data University - Challenge Fondation Roche**
-""")
+with col1:
+    st.markdown("🗺️ **Cartographie**  \nAccessibilité aux soins par commune")
+with col2:
+    st.markdown("📊 **Profils**  \nIndicateurs socio-sanitaires combinés")
+with col3:
+    st.markdown("🎯 **Clusters**  \nTypologies de territoires")

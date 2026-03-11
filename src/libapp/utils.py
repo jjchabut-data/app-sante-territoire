@@ -6,7 +6,7 @@ import numpy as np
 import pydeck as pdk
 from scipy.spatial import distance_matrix
 import plotly.graph_objects as go
-from library.config import DATA_DIR
+from libapp.config import DATA_DIR
 
 
 # ─── CONSTANTES ──────────────────────────────────────────────────────────────
@@ -35,8 +35,7 @@ TYPE_LABELS = {
 }
 
 THEMATIQUE_OPTIONS = {
-    'Score APL composite':    'score_apl',
-    'Score socio-sanitaire':  'score_irdes',
+    'Accès aux soins':        'score_apl',
     'Cluster':                'cluster',
     'APL médecins':           'apl_medecins',
     'APL dentistes':          'apl_dentistes',
@@ -104,6 +103,13 @@ _VIRIDIS_STOPS = [
     (0.875, [180, 222, 44]),
     (1.000, [253, 231, 37]),
 ]
+
+def viridis_hex(val: float, vmin: float, vmax: float) -> str:
+    """Couleur Viridis pour une valeur dans [vmin, vmax], retourne un code CSS hex."""
+    span = vmax - vmin
+    t = 0.5 if span == 0 else (val - vmin) / span
+    rgb = viridis_rgba(t)
+    return '#{:02x}{:02x}{:02x}'.format(rgb[0], rgb[1], rgb[2])
 
 def viridis_rgba(t: float, alpha: int = 200) -> list:
     t = float(np.clip(t, 0.0, 1.0))
@@ -196,7 +202,7 @@ def afficher_legende_gradient(vmin, vmax, theme_key):
     vmin_s = f'{vmin:.2f}' if abs(vmin) < 100 else f'{vmin:.0f}'
     vmax_s = f'{vmax:.2f}' if abs(vmax) < 100 else f'{vmax:.0f}'
     st.markdown(
-        f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px;">'
+        f'<div style="display:flex;align-items:center;gap:8px;margin:-3rem 0 8px;">'
         f'<span style="font-size:0.8rem;white-space:nowrap;">{vmin_s}</span>'
         f'<div style="flex:1;height:14px;border-radius:4px;'
         f'background:linear-gradient(to right,{stops});"></div>'
@@ -211,104 +217,117 @@ def _niveau_apl(apl):
     elif apl < 0.5:     return COLOR_MAP['Green'],     'Moyen',    'correcte',     'proche de la moyenne nationale', 'Accessibilité correcte mais fragile'
     else:               return COLOR_MAP['LightGreen'], 'Bon',     'bonne',        'au-dessus de la moyenne',        'Bonne accessibilité aux soins'
 
-def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl):
-    """Header reformaté : métriques à gauche, radar à droite, répartition sous radar."""
+def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
+                    theme_key='score_apl', score_apl_range=None, theme_range=None):
+    """Entête diagnostic — structure §4 : Territoire / Axe / Interprétation / Indicateur principal."""
     nb_communes = len(communes_affichees)
     population  = int(communes_affichees['population'].sum())
-    couleur_apl, niveau_label, _, _, force_msg = _niveau_apl(apl)
+    _, _, _, _, force_msg = _niveau_apl(apl)
     apl_str = f"{apl:.2f}" if not np.isnan(apl) else "N/A"
 
-    score_irdes, quintile_irdes = np.nan, None
-    if 'score_irdes' in communes_affichees.columns:
-        v = communes_affichees['score_irdes'].notna()
-        if v.sum() > 0:
-            score_irdes = float(np.average(communes_affichees.loc[v, 'score_irdes'],
-                                            weights=communes_affichees.loc[v, 'population']))
-    if 'quintile_irdes' in communes_affichees.columns:
-        q_vals = communes_affichees['quintile_irdes'].dropna()
-        if len(q_vals) > 0:
-            q_mode = q_vals.mode().iloc[0]
-            try:
-                quintile_irdes = int(q_mode)
-            except (ValueError, TypeError):
-                quintile_irdes = str(q_mode)
-
-    irdes_str = f"{score_irdes:.2f}" if not np.isnan(score_irdes) else "N/A"
-    if quintile_irdes is None:
-        q_str = "N/A"
-    elif isinstance(quintile_irdes, str):
-        q_str = quintile_irdes
+    # Couleur Viridis calée sur l'échelle nationale de la carte Offre de soins
+    if score_apl_range is not None and not np.isnan(apl):
+        couleur_apl = viridis_hex(apl, score_apl_range[0], score_apl_range[1])
     else:
-        q_str = f"Q{quintile_irdes} — {QUINTILE_LABELS.get(quintile_irdes, '')}"
-
-    sp = score_apl_par_commune(communes_affichees)
-    n_crit = int((sp < -0.5).sum())
-    n_faib = int(((sp >= -0.5) & (sp < 0)).sum())
-    n_moy  = int(((sp >= 0) & (sp < 0.5)).sum())
-    n_bon  = int((sp >= 0.5).sum())
+        couleur_apl, *_ = _niveau_apl(apl)
 
     titre = res['territoire_label']
     if res['type_terr'] == 'comm' and res.get('rayon_km') is not None:
         titre += f" — Rayon {res['rayon_km']} km"
     st.markdown(f"## {titre}")
 
-    # Layout : colonne gauche (métriques + lignes) | colonne droite (radar seul)
     col_left, col_radar = st.columns([3, 1.5])
 
     with col_left:
-        # 4 sous-colonnes métriques
-        c1, c2, c3, c4 = st.columns([1, 1.2, 1, 1])
-        with c1:
+        
+        col_insee, col_indic = st.columns([1, 1])
+        with col_insee:
             st.markdown(
-                f"**Communes**<br/>"
-                f"<span style='font-size:1.1rem;font-weight:bold;'>{nb_communes}</span><br/>"
-                f"**Population**<br/>"
-                f"<span style='font-size:1.1rem;font-weight:bold;'>{population:,}</span>",
-                unsafe_allow_html=True)
-        with c2:
+                f"<span style='color:gray;font-size:0.9rem;'>"
+                f"{nb_communes} communes<br/>"
+                f"{population:,} habitants</span>",
+                unsafe_allow_html=True
+            )
+        with col_indic:
+            # Indice d'offre de soins — rond coloré + libellé + valeur (fusionné)
             st.markdown(
-                f"**Score APL composite**<br/>"
-                f"<span style='font-size:1.3rem;font-weight:bold;'>{apl_str}</span>&nbsp;"
-                f"{_circle(couleur_apl)}"
-                f"<br/><span style='font-size:0.8rem;color:gray;'>{niveau_label}</span>",
-                unsafe_allow_html=True)
-        with c3:
-            st.markdown(
-                f"**Score socio-sanitaire**<br/>"
-                f"<span style='font-size:1.1rem;font-weight:bold;'>{irdes_str}</span>",
-                unsafe_allow_html=True)
-        with c4:
-            st.markdown(
-                f"**Quintile**<br/>"
-                f"<span style='font-size:1.1rem;font-weight:bold;'>{q_str}</span>",
+                f"{_circle(couleur_apl)} **Indice d'offre de soins** : {apl_str}",
                 unsafe_allow_html=True)
 
-        # Lignes groupées sous les métriques
+            st.markdown("<br/>", unsafe_allow_html=True)
+                    # Interprétation — description sans couleur
         if not np.isnan(apl):
-            st.markdown(
-                f"<span style='font-size:0.8rem;color:gray;'>{force_msg}</span>",
-                unsafe_allow_html=True)
-        st.markdown(
-            f"**Répartition Score APL** &nbsp;"
-            f"{_sq(COLOR_MAP['Purple'])} Crit. **{n_crit}** &nbsp;"
-            f"{_sq(COLOR_MAP['LightBlue'])} Faib. **{n_faib}** &nbsp;"
-            f"{_sq(COLOR_MAP['Green'])} Moy. **{n_moy}** &nbsp;"
-            f"{_sq(COLOR_MAP['LightGreen'])} Bon **{n_bon}**",
-            unsafe_allow_html=True)
-        apl_parts = []
-        for col_name, label in zip(APL_COLS, APL_LABELS):
-            val   = apl_moyens.get(col_name, np.nan)
-            seuil = APL_SEUILS.get(col_name, 2.5)
-            val_s = f"{val:.2f}" if not (isinstance(val, float) and np.isnan(val)) else "N/A"
-            warn  = " ⚠️" if (not (isinstance(val, float) and np.isnan(val)) and val < seuil) else ""
-            apl_parts.append(f"**{label}** : {val_s}{warn}")
-        st.markdown("**APL par profession** · " + " · ".join(apl_parts))
+            st.markdown(force_msg)
+        # Répartition — section repliable, dynamique selon la thématique carte
+        with st.expander("Répartition", expanded=False):
+            if theme_key == 'cluster':
+                df_cl = load_clusters()
+                cl_map = dict(zip(df_cl['code_insee'], df_cl['cluster']))
+                clusters = communes_affichees['code_insee'].map(cl_map)
+                lines = []
+                for i, name in CLUSTER_NAMES.items():
+                    count = int((clusters == i).sum())
+                    lines.append(f"{_sq(CLUSTER_COLORS_HEX[i])} **{name}** : {count}")
+                st.markdown("<br/>".join(lines), unsafe_allow_html=True)
+
+            elif theme_key in APL_COLS:
+                vals = communes_affichees[theme_key]
+                n_crit = int((vals < 2.5).sum())
+                n_faib = int(((vals >= 2.5) & (vals < 3.5)).sum())
+                n_moy  = int(((vals >= 3.5) & (vals < 5.0)).sum())
+                n_bon  = int((vals >= 5.0).sum())
+                if theme_range is not None:
+                    vmin_r, vmax_r = theme_range
+                    c_crit = viridis_hex(1.25,   vmin_r, vmax_r)
+                    c_faib = viridis_hex(3.0,    vmin_r, vmax_r)
+                    c_moy  = viridis_hex(4.25,   vmin_r, vmax_r)
+                    c_bon  = viridis_hex(vmax_r,  vmin_r, vmax_r)
+                else:
+                    c_crit, c_faib = COLOR_MAP['Purple'], COLOR_MAP['LightBlue']
+                    c_moy,  c_bon  = COLOR_MAP['Green'],  COLOR_MAP['LightGreen']
+                st.markdown(
+                    f"{_sq(c_crit)} Critique : **{n_crit}**<br/>"
+                    f"{_sq(c_faib)} Faible : **{n_faib}**<br/>"
+                    f"{_sq(c_moy)} Moyen : **{n_moy}**<br/>"
+                    f"{_sq(c_bon)} Bon : **{n_bon}**",
+                    unsafe_allow_html=True)
+
+            else:  # score_apl
+                sp = score_apl_par_commune(communes_affichees)
+                n_crit = int((sp < -0.5).sum())
+                n_faib = int(((sp >= -0.5) & (sp < 0)).sum())
+                n_moy  = int(((sp >= 0) & (sp < 0.5)).sum())
+                n_bon  = int((sp >= 0.5).sum())
+                if theme_range is not None:
+                    vmin_r, vmax_r = theme_range
+                    c_crit = viridis_hex(-0.75, vmin_r, vmax_r)
+                    c_faib = viridis_hex(-0.25, vmin_r, vmax_r)
+                    c_moy  = viridis_hex(0.25,  vmin_r, vmax_r)
+                    c_bon  = viridis_hex(0.75,  vmin_r, vmax_r)
+                else:
+                    c_crit, c_faib = COLOR_MAP['Purple'], COLOR_MAP['LightBlue']
+                    c_moy,  c_bon  = COLOR_MAP['Green'],  COLOR_MAP['LightGreen']
+                st.markdown(
+                    f"{_sq(c_crit)} Critique : **{n_crit}**<br/>"
+                    f"{_sq(c_faib)} Faible : **{n_faib}**<br/>"
+                    f"{_sq(c_moy)} Moyen : **{n_moy}**<br/>"
+                    f"{_sq(c_bon)} Bon : **{n_bon}**",
+                    unsafe_allow_html=True)
+
+        # Offre de soins par profession — section repliable
+        with st.expander("Offre de soins par profession", expanded=False):
+            for col_name, label in zip(APL_COLS, APL_LABELS):
+                val   = apl_moyens.get(col_name, np.nan)
+                seuil = APL_SEUILS.get(col_name, 2.5)
+                val_s = f"{val:.2f}" if not (isinstance(val, float) and np.isnan(val)) else "N/A"
+                warn  = ""
+                st.markdown(f"**{label}** : {val_s}{warn}")
 
     with col_radar:
-        st.markdown("<br/>", unsafe_allow_html=True)
         if nb_communes > 1:
+            _radar_key = f"radar_{nb_communes}_{round(sum((apl_std_moyens.get(c) or 0) for c in APL_STD_COLS), 4)}"
             st.plotly_chart(creer_radar(apl_std_moyens), use_container_width=True,
-                            config={'displayModeBar': False})
+                            config={'displayModeBar': False}, key=_radar_key)
 
 # ─── CSS ─────────────────────────────────────────────────────────────────────
 
@@ -328,8 +347,12 @@ p, li, div[data-testid="stMarkdownContainer"] {
 [data-testid="stMetricLabel"] { font-size: 0.8rem !important; }
 [data-testid="stMetricValue"] { font-size: 1.1rem !important; }
 [data-testid="stPlotlyChart"] { margin-top: -1rem !important; margin-bottom: -1rem !important; }
+[data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child > div:first-child {
+    margin-top: -1rem !important;
+    padding-top: 0 !important;
+}
 span[data-baseweb="tag"] {
-    background-color: #91cf60 !important;
+    background-color: #e0e0e0 !important;
 }
 span[data-baseweb="tag"] span {
     color: #1a1a1a !important;
@@ -740,10 +763,13 @@ def creer_radar(apl_std_moyens):
     ))
 
     fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, scale_max], showticklabels=False)),
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, scale_max], showticklabels=False),
+            angularaxis=dict(tickfont=dict(size=10)),
+        ),
         showlegend=True,
-        legend=dict(orientation='h', y=1.30, x=0.5, xanchor='center'),
-        height=200,
-        margin=dict(l=10, r=10, t=40, b=0),
+        legend=dict(orientation='h', y=-0.18, x=0.5, xanchor='center', font=dict(size=10)),
+        height=240,
+        margin=dict(l=40, r=40, t=20, b=50),
     )
     return fig

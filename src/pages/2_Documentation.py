@@ -1,11 +1,20 @@
 import streamlit as st
-from utils import inject_css
+from libapp.utils import inject_css
 
 inject_css()
 
 st.title("📖 Documentation")
 
 st.markdown("""
+## Fonction rayon
+          
+Les zones définies par rayon sont construites à partir des communes dont le point représentatif se situe à l’intérieur du rayon choisi.
+
+Les indicateurs agrégés sur une zone définie par rayon sont calculés par moyenne pondérée par la population des communes incluses.
+## Carte
+
+Échelle de couleur calée sur les p2–p98 nationaux — indépendante du territoire affiché.
+            
 ## Score APL — Méthodologie
 
 Score composite d'accessibilité aux soins primaires calculé comme suit :

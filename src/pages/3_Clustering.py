@@ -2,11 +2,12 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import pydeck as pdk
-from utils import (
+from libapp.utils import (
     inject_css, CLUSTER_FEATURES,
     CLUSTER_NAMES, CLUSTER_COLORS_HEX, CLUSTER_COLORS_RGBA, N_CLUSTERS,
     load_clusters, score_apl_par_commune,
 )
+from libapp.config import DEBUG
 
 inject_css()
 
@@ -109,8 +110,6 @@ col_cfg = {
     'besoins':      st.column_config.NumberColumn('Besoins (σ)', format='%.2f'),
 }
 st.dataframe(df_stats, column_config=col_cfg, hide_index=True, use_container_width=True)
-
-DEBUG = True  # passer à False en prod
 
 if DEBUG:
     import psutil
