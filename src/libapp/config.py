@@ -124,13 +124,13 @@ FOLIUM_TILES = {
 FOLIUM_TILE_DEFAULT = "OpenStreetMap"
 
 THEMATIQUE_OPTIONS = {
-    'Accès aux soins':        'score_apl',
-    'Cluster':                'cluster',
-    'APL médecins':           'apl_medecins',
-    'APL dentistes':          'apl_dentistes',
-    'APL infirmiers':         'apl_infirmiers',
-    'APL kinésithérapeutes':  'apl_kines',
-    'APL sages-femmes':       'apl_sagefemmes',
+    '🏥 Accès aux soins':        'score_apl',
+    '👨‍⚕️ Médecins généralistes':  'apl_medecins',
+    '🦷 Dentistes':          'apl_dentistes',
+    '💉 Infirmiers':         'apl_infirmiers',
+    '🏃 Kinésithérapeutes':  'apl_kines',
+    '👶 Sages-femmes':       'apl_sagefemmes',
+    '🧩 Cluster':            'cluster',
 }
 
 APL_SEUILS = {
