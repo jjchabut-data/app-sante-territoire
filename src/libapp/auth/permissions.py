@@ -3,8 +3,7 @@ from libapp.config import USAGE_TO_MODE
 
 # --- Définition centralisée de toutes les pages ---
 ALL_PAGES = {
-    "accueil":       st.Page("pages/0_Accueil.py",      title="Accueil",       icon="🏠", default=True),
-    "diagnostic":    st.Page("pages/1_Diagnostic.py",   title="Diagnostic",    icon="🩺"),
+    "diagnostic":    st.Page("pages/1_Diagnostic.py",   title="Diagnostic",    icon="🩺", default=True),
     "clustering":    st.Page("pages/3_Clustering.py",   title="Clustering",    icon="🎯"),
     "agent_ia":      st.Page("pages/4_Agent IA.py",     title="Agent IA",      icon="🤖"),
     "documentation": st.Page("pages/Documentation.py",  title="Documentation", icon="📖"),
@@ -15,17 +14,14 @@ ALL_PAGES = {
 # Reproduit la structure de st.navigation(dict) avec sections
 ROLES = {
     "admin": {
-        "": ["accueil"],
         "Analyse": ["diagnostic", "clustering", "agent_ia"],
         "Références": ["documentation", "lexique"],
     },
     "guest": {
-    "": ["accueil"],
-    "Analyse": ["diagnostic", "clustering", "agent_ia"],
-    "Références": ["documentation", "lexique"],
+        "Analyse": ["diagnostic", "clustering"],
+        "Références": ["documentation", "lexique"],
     },
     "visitor": {
-        "": ["accueil"],
         "Analyse": ["diagnostic"],
         "Références": ["documentation", "lexique"],
     },

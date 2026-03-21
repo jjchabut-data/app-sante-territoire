@@ -1,28 +1,35 @@
 import time
 import streamlit as st
 from libapp.llm import generate_analyse, get_available_ollama_models
+from libapp.auth import current_user
 
 st.header("🤖 Agent IA — Analyse territoriale de santé")
 
 # ---------------------------------------------------------------------------
-# Sidebar — choix du moteur
+# Sidebar — choix du moteur (admin uniquement)
 # ---------------------------------------------------------------------------
-with st.sidebar:
-    st.header("Moteur d'analyse")
+_role = current_user().get("role", "visitor")
 
-    ollama_models = get_available_ollama_models()
-    moteurs_disponibles = ["Anthropic (Cloud)"]
-    if ollama_models:
-        moteurs_disponibles.append("Ollama (Local)")
+if _role == "admin":
+    with st.sidebar:
+        st.header("Moteur d'analyse")
 
-    moteur = st.radio("Moteur :", moteurs_disponibles)
+        ollama_models = get_available_ollama_models()
+        moteurs_disponibles = ["Anthropic (Cloud)"]
+        if ollama_models:
+            moteurs_disponibles.append("Ollama (Local)")
 
-    if moteur == "Ollama (Local)":
-        selected_model = st.selectbox("Modèle Ollama", ollama_models)
-        st.info(f"Modèle : **{selected_model}**")
-    else:
-        selected_model = None
-        st.info("Modèle : **claude-sonnet-4-20250514**")
+        moteur = st.radio("Moteur :", moteurs_disponibles)
+
+        if moteur == "Ollama (Local)":
+            selected_model = st.selectbox("Modèle Ollama", ollama_models)
+            st.info(f"Modèle : **{selected_model}**")
+        else:
+            selected_model = None
+            st.info("Modèle : **claude-sonnet-4-20250514**")
+else:
+    moteur = "Anthropic (Cloud)"
+    selected_model = None
 
 # ---------------------------------------------------------------------------
 # Corps — analyse
@@ -52,7 +59,7 @@ if "res" in st.session_state and "communes_affichees" in st.session_state:
                 duree = time.time() - t0
 
                 st.markdown("### Analyse")
-                st.markdown(analyse)
+                st.markdown(f"<div style='font-size:1.1rem;line-height:1.7'>{analyse}</div>", unsafe_allow_html=True)
 
                 # Métriques
                 tokens_in  = usage.get("input_tokens")

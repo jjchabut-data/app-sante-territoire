@@ -66,7 +66,7 @@ def get_color_hex(apl_val):
 
 def niveau_apl(quintile):
     """Retourne (hex_color, label) pour un quintile (0 = pas de données, 1-5)."""
-    q = 0 if (quintile is None or (isinstance(quintile, float) and pd.isna(quintile))) else int(quintile)
+    q = 0 if (quintile is None or pd.isna(quintile)) else int(quintile)
     return QUINTILE_COLORS.get(q, QUINTILE_COLORS[0]), QUINTILE_LABELS.get(q, 'Inconnu')
 
 def quintile_fill_color(quintile, alpha: int = MAP_FILL_ALPHA) -> list:

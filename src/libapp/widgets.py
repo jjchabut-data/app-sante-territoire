@@ -137,7 +137,7 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
         col_analyse, col_theme = st.columns([2, 1])
         with col_analyse:
             if not np.isnan(apl):
-                st.markdown(force_msg)
+                st.markdown(f"<div style='font-size:1.05rem'>{force_msg}</div>", unsafe_allow_html=True)
         with col_theme:
             with st.popover("Thématique"):
                 thematique_label = st.radio(

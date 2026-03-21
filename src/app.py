@@ -36,6 +36,7 @@ else:
             logout()
             st.rerun()
 
+
     pg = st.navigation(pages, position="top")
 
 pg.run()
