@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-from libapp.utils import (
-    score_apl_par_commune, load_clusters, afficher_titre_territoire,
-    APL_COLS, CLUSTER_NAMES,
-)
+from libapp import utils
+from libapp import widgets
+from libapp.utils import APL_COLS, CLUSTER_NAMES
 
 
 def render():
@@ -13,12 +12,12 @@ def render():
         return
 
     res = st.session_state['resultats']
-    afficher_titre_territoire(res)
+    widgets.afficher_titre_territoire(res)
 
     df_tab = communes.copy()
-    df_tab['score_apl'] = score_apl_par_commune(df_tab).round(3)
+    df_tab['score_apl'] = utils.score_apl_par_commune(df_tab).round(3)
 
-    df_cl = load_clusters()
+    df_cl = utils.load_clusters()
     cluster_map = dict(zip(df_cl['code_insee'], df_cl['cluster']))
     df_tab['profil'] = df_tab['code_insee'].map(cluster_map).apply(
         lambda x: CLUSTER_NAMES.get(int(x)) if pd.notna(x) else None)
@@ -36,7 +35,7 @@ def render():
         'apl_dentistes':   st.column_config.ProgressColumn('Dentistes',    min_value=0, max_value=apl_nat_p95['apl_dentistes'],    format='%.1f'),
         'apl_infirmiers':  st.column_config.ProgressColumn('Infirmiers',   min_value=0, max_value=apl_nat_p95['apl_infirmiers'],   format='%.1f'),
         'apl_kines':       st.column_config.ProgressColumn('Kinés',        min_value=0, max_value=apl_nat_p95['apl_kines'],        format='%.1f'),
-        'apl_sagesfemmes': st.column_config.ProgressColumn('Sages-femmes', min_value=0, max_value=apl_nat_p95['apl_sagesfemmes'], format='%.1f'),
+        'apl_sagefemmes': st.column_config.ProgressColumn('Sages-femmes', min_value=0, max_value=apl_nat_p95['apl_sagefemmes'], format='%.1f'),
     }
     if res['type_terr'] == 'comm':
         col_cfg['distance_km'] = st.column_config.NumberColumn('Distance (km)', format='%.1f')

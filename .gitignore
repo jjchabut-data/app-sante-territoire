@@ -1,7 +1,10 @@
-data/raw/*
+data/*
 notebooks/*
+docs/*
+POC/*
 .DS_Store
 __pycache__/
 *.pyc
 config.yaml
 .python-version
+.streamlit/secrets.toml

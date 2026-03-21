@@ -136,7 +136,7 @@ with tab1:
             score_commune = score_apl_par_commune(communes_affichees).rename('score_apl')
 
             cols_merge = ['code_insee', 'code_dept', 'population'] + APL_COLS
-            for extra in ['score_irdes', 'quintile_irdes', 'mort_premature_std', 'besoins_std']:
+            for extra in ['quintile_apl_nat', 'mort_premature_std', 'besoins_std']:
                 if extra in communes_affichees.columns:
                     cols_merge.append(extra)
 
@@ -153,8 +153,6 @@ with tab1:
             _df_scores = df_indic[APL_STD_COLS].mul([0.35, 0.15, 0.25, 0.20, 0.05]).sum(axis=1)
             RANGES = {
                 'score_apl':   tuple(_df_scores.quantile([0.02, 0.98]).values),
-                'score_irdes': tuple(df_indic['score_irdes'].quantile([0.02, 0.98]).values)
-                               if 'score_irdes' in df_indic.columns else (-2.0, 2.0),
                 'cluster':     (0, 4),
             }
             for col in APL_COLS:

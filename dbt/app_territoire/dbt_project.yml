@@ -22,6 +22,14 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
+vars:
+  annee_apl: 2023
+  annee_tps_acces_urgences: 2019
+  annee_taux_mortalite: 2024
+  annee_esperance_vie: 2024
+  annee_pop_selon_age: 2023
+  annee_vieillissement: 2025
+  version_densite: "2025_geo_2025"
 
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
@@ -29,8 +37,39 @@ clean-targets:         # directories to be removed by `dbt clean`
 # In this example config, we tell dbt to build all models in the example/
 # directory as views. These settings can be overridden in the individual model
 # files using the `{{ config(...) }}` macro.
+
 models:
   app_territoire:
-    # Config indicated by + and applies to all files under models/example/
-    example:
-      +materialized: view
+    +materialized: view
+    referentiel:
+      +tags: ["referentiel"]
+      staging:
+        +schema: stg
+        +tags: ["staging"]
+      intermediate:
+        +schema: int
+        +tags: ["intermediate"]
+      marts:
+        +materialized: table
+        +schema: mart
+        +tags: ["marts"]
+    sante:
+      +tags: ["sante"]
+      staging:
+        +tags: ["staging"]
+        +schema: stg
+      intermediate:
+        +tags: ["intermediate"]
+        +schema: int
+      marts:
+        +materialized: table
+        +schema: mart
+        +tags: ["marts"]
+    socio_demo:
+      staging:
+        +schema: stg
+      intermediate:
+        +schema: int
+      marts:
+        +materialized: table
+        +schema: mart

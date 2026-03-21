@@ -1,0 +1,11 @@
+# models/sante/intermediate/schema.yml
+
+version: 2
+
+models:
+  - name: int_apl_current_all
+    description: >
+      Vue sur le millésime APL actif, contrôlé par la variable dbt `annee_apl` 
+      (définie dans dbt_project.yml, actuellement 2023).
+      Pour basculer sur un nouveau millésime : dbt run --vars '{"annee_apl": 2024}'.
+

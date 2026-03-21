@@ -1,0 +1,4 @@
+models:
+  - name: int_densite_communes_current
+    config:
+      tags: ["densite"]
