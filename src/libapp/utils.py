@@ -79,7 +79,7 @@ def quintile_fill_color(quintile, alpha: int = MAP_FILL_ALPHA) -> list:
 
 @st.cache_data
 def load_indicateurs():
-    df = pd.read_parquet(DATA_DIR.parent / 'marts' / 'mart_sante_comm_indic.parquet')
+    df = pd.read_parquet(DATA_DIR / 'mart_sante_comm_indic.parquet')
     df = df.rename(columns={
         'code_commune':    'code_insee',
         'code_departement':'code_dept',
