@@ -2,14 +2,15 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import pydeck as pdk
+from libapp import utils
+from libapp import widgets
 from libapp.utils import (
-    inject_css, CLUSTER_FEATURES,
+    CLUSTER_FEATURES,
     CLUSTER_NAMES, CLUSTER_COLORS_HEX, CLUSTER_COLORS_RGBA, N_CLUSTERS,
-    load_clusters, score_apl_par_commune,
 )
 from libapp.config import DEBUG
 
-inject_css()
+widgets.inject_css()
 
 st.title("🧩 Clustering territorial")
 
@@ -21,7 +22,7 @@ except Exception:
 
 # ── Chargement clusters pré-calculés ─────────────────────────────────────────
 
-df_cl = load_clusters()
+df_cl = utils.load_clusters()
 
 df_indic_cl = df_indic.merge(df_cl[['code_insee', 'cluster']], on='code_insee', how='left')
 df_indic_cl['cluster_name'] = df_indic_cl['cluster'].map(CLUSTER_NAMES)
@@ -29,7 +30,7 @@ df_indic_cl['fill_color']   = [
     CLUSTER_COLORS_RGBA[int(c)] if pd.notna(c) else [128, 128, 128, 100]
     for c in df_indic_cl['cluster']
 ]
-df_indic_cl['score_apl'] = score_apl_par_commune(df_indic_cl)
+df_indic_cl['score_apl'] = utils.score_apl_par_commune(df_indic_cl)
 
 # Centres : moyennes par cluster
 centers = (
@@ -57,7 +58,6 @@ for i in range(N_CLUSTERS):
         'pct_pop':      round(pop / total_pop * 100, 1),
         'score_apl':    round(float((centers[i, :5] * apl_weights).sum()), 2),
         'urbanite':     round(float(centers[i, 5]), 2),
-        'besoins':      round(float(centers[i, 6]), 2),
     })
 df_stats = pd.DataFrame(rows)
 
@@ -106,8 +106,7 @@ col_cfg = {
     'pct_pop':      st.column_config.NumberColumn('% population', format='%.1f %%'),
     'score_apl':    st.column_config.NumberColumn('Score APL', format='%.2f',
                         help='Score composite pondéré (z-score) — 0 = moy. nationale'),
-    'urbanite':     st.column_config.NumberColumn('Urbanité (σ)', format='%.2f'),
-    'besoins':      st.column_config.NumberColumn('Besoins (σ)', format='%.2f'),
+    'urbanite':     st.column_config.NumberColumn('Urbanité (score)', format='%.2f'),
 }
 st.dataframe(df_stats, column_config=col_cfg, hide_index=True, use_container_width=True)
 
@@ -150,9 +149,8 @@ K-Means partitionne les communes en **5 groupes** en minimisant la variance intr
 | `apl_dentistes_std`   | APL dentistes (z-score)                           |
 | `apl_infirmiers_std`  | APL infirmiers (z-score)                          |
 | `apl_kines_std`       | APL kinésithérapeutes (z-score)                   |
-| `apl_sagesfemmes_std` | APL sages-femmes (z-score)                        |
-| `urbanite_std`        | Densité de population standardisée                |
-| `besoins_std`         | Indice de besoins en soins (mortalité, précarité) |
+| `apl_sagefemmes_std`  | APL sages-femmes (z-score)                        |
+| `urbanite_score`      | Score de densité/urbanité                         |
 
 ---
 

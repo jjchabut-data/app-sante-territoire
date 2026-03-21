@@ -1,0 +1,4 @@
+{
+    "dbt.lineage.defaultExpansion": 4,
+    "dbt.dbtPath": "/Users/jean-jacques/.pyenv/versions/3.11.8/envs/app-sante-terri/bin/dbt"
+}

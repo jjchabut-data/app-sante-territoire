@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: raw
+    database: app-territoire
+    schema: raw
+    tables:
+      - name: ref_arr_muni_geom_2026
+      - name: ref_comm_geom_2026
+      - name: ref_comm_remembrement_2026
+      - name: ref_dept_geom_2026
+      - name: ref_epci_geom_2026
+      - name: ref_region_geom_2026
+      - name: densite_comm_2025_geo_2025
+      - name:  densite_epci_2025_geo_2025
+      - name:  densite_bassinvie_2025_geo_2025
+      - name:  densite_dept_2025_geo_2025

@@ -6,11 +6,15 @@
 public des données de référence. C'est le référentiel d'adresses officiellement
 reconnu par l’administration.
 
+**FDep** : French Deprivation Index, indice de défavorisation sociale (FDep) par IRIS
+
 **FiLoSoFi** : **Fi**chier **Lo**calisé **So**cial et **Fi**scal
 
 **FINESS** :  Fichier national des établissements sanitaires et sociaux. Identifiant FINESS de l'entité juridique attribué lors de sa création. Les personnes morales identifiées par des numéros FINESS sont également dotées de numéros Siren. Le numéro FINESS étant porteur intrinsèquement de liens avec le domaine sanitaire ou le domaine médico-social, il est, s'il existe, à privilégier pour l’identification de ces personnes morales en tant qu’acteurs sanitaires et médico-sociaux
 
 **IRIS** : Ilots Regroupés pour l'Information Statistique (niveau quartier)
+
+**Taux de vieillissement** : Rapport de la population des 65 ans ou plus sur la population des moins de 20 ans
 
 **RNB** : Le Référentiel national des bâtiments (RNB) est un service public numérique, qui a
 pour vocation de créer une nouvelle donnée nationale de référence du bâtiment.

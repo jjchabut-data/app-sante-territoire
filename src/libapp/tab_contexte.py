@@ -2,12 +2,9 @@ import pandas as pd
 import geopandas as gpd
 import pydeck as pdk
 import streamlit as st
-from libapp.utils import (
-    load_fdep, load_geom_iris, load_geom_communes,
-    score_apl_par_commune, get_thematic_fill_color,
-    afficher_legende_gradient, afficher_titre_territoire,
-    _zoom_depuis_bounds,
-)
+from libapp import utils
+from libapp import carte
+from libapp import widgets
 
 
 FDEP_OPTIONS = {
@@ -31,18 +28,18 @@ def render():
         st.info("L'onglet **Quartiers** est disponible uniquement pour les sélections par **Commune** (rayon) ou **EPCI**.")
         return
 
-    df_fdep = load_fdep()
+    df_fdep = utils.load_fdep()
     codes   = communes['code_insee'].tolist()
 
     # ── IRIS type H (quartiers urbains) ───────────────────────────────────────
-    iris_h = load_geom_iris(tuple(sorted(codes)))
+    iris_h = utils.load_geom_iris(tuple(sorted(codes)))
 
     # ── Communes sans IRIS type H (communes non découpées, type Z) ────────────
     codes_avec_h = set(iris_h['code_insee_comm'].unique()) if len(iris_h) > 0 else set()
     codes_sans_h = [c for c in codes if c not in codes_avec_h]
 
     if codes_sans_h:
-        gdf_comm = load_geom_communes()
+        gdf_comm = utils.load_geom_communes()
         gdf_z = gdf_comm[gdf_comm['code_insee'].isin(codes_sans_h)].copy()
 
         if len(gdf_z) > 0:
@@ -77,7 +74,7 @@ def render():
         on='code_iris', how='left')
 
     # ── Jointure données commune parente ──────────────────────────────────────
-    score_comm = score_apl_par_commune(communes).rename('score_apl')
+    score_comm = utils.score_apl_par_commune(communes).rename('score_apl')
     comm_info  = communes[['code_insee', 'nom_commune', 'apl_medecins']].copy()
     comm_info['score_apl'] = score_comm.values
     iris_sel = iris_sel.merge(
@@ -104,7 +101,7 @@ def render():
     vmax = float(vals.quantile(0.98)) if vals.notna().sum() > 0 else 1.0
 
     iris_sel['fill_color'] = [
-        get_thematic_fill_color(
+        utils.get_thematic_fill_color(
             (vmax - v + vmin) if (invert and not pd.isna(v)) else v,
             vmin, vmax)
         for v in vals
@@ -114,7 +111,7 @@ def render():
     bounds     = iris_sel.total_bounds
     center_lat = (bounds[1] + bounds[3]) / 2
     center_lon = (bounds[0] + bounds[2]) / 2
-    zoom       = _zoom_depuis_bounds(bounds[0], bounds[1], bounds[2], bounds[3])
+    zoom       = carte._zoom_depuis_bounds(bounds[0], bounds[1], bounds[2], bounds[3])
 
     layer = pdk.Layer(
         "GeoJsonLayer", iris_sel,
@@ -143,8 +140,8 @@ def render():
         },
     )
 
-    afficher_titre_territoire(res)
-    afficher_legende_gradient(vmin, vmax, theme_col)
+    widgets.afficher_titre_territoire(res)
+    widgets.afficher_legende_gradient(vmin, vmax, theme_col)
     st.pydeck_chart(deck, height=600)
 
     nb_iris_h = len(iris_h)

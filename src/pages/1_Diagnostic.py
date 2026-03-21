@@ -1,12 +1,12 @@
 import streamlit as st
-from libapp.utils import inject_css
+from libapp import widgets
 import libapp.tab_selection    as tab_selection
 import libapp.tab_tableaux     as tab_tableaux
 import libapp.tab_graphiques   as tab_graphiques
 import libapp.tab_contexte     as tab_contexte
 import libapp.tab_methodologie as tab_methodologie
 
-inject_css()
+widgets.inject_css()
 
 st.title("Outil de Diagnostic Territorial")
 

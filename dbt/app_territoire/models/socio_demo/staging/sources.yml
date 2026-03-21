@@ -1,0 +1,16 @@
+version: 2
+
+sources:
+  - name: raw
+    database: app-territoire
+    schema: raw
+    tables:
+      - name: isd_c01_pop_selon_age_2023
+      - name: isd_c01_pop_selon_age_2024
+      - name: isd_c01_pop_selon_age_2025
+      - name: isd_c02_ind_vieillisement_1999_2025
+      - name: isd_c03_tx_mortalite_2024
+      - name: isd_c04_esperance_vie_2021
+      - name: isd_c04_esperance_vie_2022
+      - name: isd_c04_esperance_vie_2023
+      - name: isd_c04_esperance_vie_2024

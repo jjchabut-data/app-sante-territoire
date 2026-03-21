@@ -1,0 +1,25 @@
+version: 2
+
+sources:
+  - name: raw
+    database: app-territoire
+    schema: raw
+    tables:
+      - name: apl_medecins_2019
+      - name: apl_medecins_2022
+      - name: apl_medecins_2023
+      - name: apl_dentistes_2022
+      - name: apl_dentistes_2023
+      - name: apl_infirmiers_2019
+      - name: apl_infirmiers_2022
+      - name: apl_infirmiers_2023
+      - name: apl_kines_2019
+      - name: apl_kines_2022
+      - name: apl_kines_2023
+      - name: apl_sagesfemmes_2019
+      - name: apl_sagesfemmes_2022
+      - name: apl_sagesfemmes_2023
+      - name: apls_wide_2017
+      - name: temps_acces_urgences_2015
+      - name: temps_acces_urgences_2019
+      

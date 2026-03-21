@@ -1,0 +1,193 @@
+version: 2
+
+models:
+  - name: mart_apl_commune
+    description: "{{ doc('mart_apl_commune') }}"
+    columns:
+
+      # --- Identifiant ---
+      - name: code_commune
+        data_type: string
+        description: "{{ doc('code_commune') }}"
+        tests:
+          - not_null
+          - unique
+
+      # --- Référentiel géographique ---
+      - name: nom_commune
+        data_type: string
+        description: "{{ doc('nom_commune') }}"
+      - name: population
+        data_type: int64
+        description: "{{ doc('population') }}"
+      - name: code_epci
+        data_type: string
+        description: "{{ doc('code_epci') }}"
+      - name: code_departement
+        data_type: string
+        description: "{{ doc('code_departement') }}"
+      - name: code_region
+        data_type: string
+        description: "{{ doc('code_region') }}"
+      - name: lon
+        data_type: float64
+        description: "{{ doc('lon') }}"
+      - name: lat
+        data_type: float64
+        description: "{{ doc('lat') }}"
+
+      # --- Médecins généralistes ---
+      - name: apl_medecins
+        data_type: float64
+        description: "{{ doc('apl_medecins') }}"
+      - name: apl_medecins_std
+        data_type: float64
+        description: "{{ doc('apl_std') }}"
+      - name: quintile_medecins
+        data_type: int64
+        description: "{{ doc('quintile_apl') }}"
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+      - name: quintile_label_medecins
+        data_type: string
+        description: "{{ doc('quintile_label_apl') }}"
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['très faible', 'faible', 'moyen', 'élevé', 'très élevé']
+
+      # --- Médecins 65 ans et moins ---
+      - name: apl_med_65
+        data_type: float64
+        description: "{{ doc('apl_med_65') }}"
+      - name: apl_med_65_std
+        data_type: float64
+        description: "{{ doc('apl_std') }}"
+      - name: quintile_med_65
+        data_type: int64
+        description: "{{ doc('quintile_apl') }}"
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+      - name: quintile_label_med_65
+        data_type: string
+        description: "{{ doc('quintile_label_apl') }}"
+
+      # --- Médecins 62 ans et moins ---
+      - name: apl_med_62
+        data_type: float64
+        description: "{{ doc('apl_med_62') }}"
+      - name: apl_med_62_std
+        data_type: float64
+        description: "{{ doc('apl_std') }}"
+      - name: quintile_med_62
+        data_type: int64
+        description: "{{ doc('quintile_apl') }}"
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+      - name: quintile_label_med_62
+        data_type: string
+        description: "{{ doc('quintile_label_apl') }}"
+
+      # --- Médecins 60 ans et moins ---
+      - name: apl_med_60
+        data_type: float64
+        description: "{{ doc('apl_med_60') }}"
+      - name: apl_med_60_std
+        data_type: float64
+        description: "{{ doc('apl_std') }}"
+      - name: quintile_med_60
+        data_type: int64
+        description: "{{ doc('quintile_apl') }}"
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+      - name: quintile_label_med_60
+        data_type: string
+        description: "{{ doc('quintile_label_apl') }}"
+
+      # --- Chirurgiens-dentistes ---
+      - name: apl_dentistes
+        data_type: float64
+        description: "{{ doc('apl_dentistes') }}"
+      - name: apl_dentistes_std
+        data_type: float64
+        description: "{{ doc('apl_std') }}"
+      - name: quintile_dentistes
+        data_type: int64
+        description: "{{ doc('quintile_apl') }}"
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+      - name: quintile_label_dentistes
+        data_type: string
+        description: "{{ doc('quintile_label_apl') }}"
+
+      # --- Infirmiers ---
+      - name: apl_infirmiers
+        data_type: float64
+        description: "{{ doc('apl_infirmiers') }}"
+      - name: apl_infirmiers_std
+        data_type: float64
+        description: "{{ doc('apl_std') }}"
+      - name: quintile_infirmiers
+        data_type: int64
+        description: "{{ doc('quintile_apl') }}"
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+      - name: quintile_label_infirmiers
+        data_type: string
+        description: "{{ doc('quintile_label_apl') }}"
+
+      # --- Kinésithérapeutes ---
+      - name: apl_kines
+        data_type: float64
+        description: "{{ doc('apl_kines') }}"
+      - name: apl_kines_std
+        data_type: float64
+        description: "{{ doc('apl_std') }}"
+      - name: quintile_kines
+        data_type: int64
+        description: "{{ doc('quintile_apl') }}"
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+      - name: quintile_label_kines
+        data_type: string
+        description: "{{ doc('quintile_label_apl') }}"
+
+      # --- Sages-femmes ---
+      - name: apl_sagefemmes
+        data_type: float64
+        description: "{{ doc('apl_sagefemmes') }}"
+      - name: apl_sagefemmes_std
+        data_type: float64
+        description: "{{ doc('apl_std') }}"
+      - name: quintile_sagefemmes
+        data_type: int64
+        description: "{{ doc('quintile_apl') }}"
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+      - name: quintile_label_sagefemmes
+        data_type: string
+        description: "{{ doc('quintile_label_apl') }}"
+
+      # --- Score synthétique ---
+      - name: score_apl
+        data_type: float64
+        description: "{{ doc('score_apl') }}"
+      - name: score_apl_std
+        data_type: float64
+        description: "{{ doc('score_apl_std') }}"

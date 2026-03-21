@@ -1,9 +1,8 @@
 import streamlit as st
 import plotly.graph_objects as go
-from libapp.utils import (
-    calculer_apl_moyens, afficher_titre_territoire,
-    APL_STD_COLS, APL_LABELS, COLOR_MAP,
-)
+from libapp import utils
+from libapp import widgets
+from libapp.utils import APL_STD_COLS, APL_LABELS, COLOR_MAP
 
 
 def render():
@@ -13,9 +12,9 @@ def render():
         return
 
     res = st.session_state['resultats']
-    afficher_titre_territoire(res)
+    widgets.afficher_titre_territoire(res)
 
-    apl_std_moyens = calculer_apl_moyens(communes, APL_STD_COLS)
+    apl_std_moyens = utils.calculer_apl_moyens(communes, APL_STD_COLS)
 
     st.markdown("### Score APL standardisé par profession")
     vals_std = [apl_std_moyens.get(c, 0) or 0 for c in APL_STD_COLS]
