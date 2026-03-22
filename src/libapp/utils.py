@@ -83,7 +83,7 @@ def load_indicateurs():
     df = df.rename(columns={
         'code_commune':    'code_insee',
         'code_departement':'code_dept',
-        'code_epci':       'codes_siren_epci',
+        'codes_epci':      'codes_siren_epci',
         'lat':             'latitude',
         'lon':             'longitude',
     })
