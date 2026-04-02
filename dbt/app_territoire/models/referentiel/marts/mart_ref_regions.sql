@@ -1,7 +1,7 @@
 -- referentiel/marts/mart_ref_regions.sql
 select
-    code_region     as code,
-    nom_region      as nom,
-    lon,
-    lat
-from {{ ref('stg_regions') }}
+    code,
+    nom,
+    longitude,
+    latitude
+from {{ ref('int_ref_regions') }}

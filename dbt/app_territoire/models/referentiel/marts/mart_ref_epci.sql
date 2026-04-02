@@ -1,8 +1,8 @@
 -- referentiel/marts/mart_ref_epci.sql
 select
-    code_epci   as code,
-    nom_epci    as nom,
-    type_epci,
-    lon,
-    lat
-from {{ ref('stg_epci') }}
+    code,
+    nom,
+    type,
+    longitude,
+    latitude
+from {{ ref('int_ref_epci') }}

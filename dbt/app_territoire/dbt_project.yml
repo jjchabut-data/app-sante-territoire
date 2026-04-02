@@ -24,6 +24,7 @@ clean-targets:         # directories to be removed by `dbt clean`
 
 vars:
   annee_apl: 2023
+  annee_COG: 2026
   annee_tps_acces_urgences: 2019
   annee_taux_mortalite: 2024
   annee_esperance_vie: 2024
