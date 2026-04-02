@@ -1,15 +1,15 @@
 import streamlit as st
 from libapp import widgets
 import libapp.tab_selection    as tab_selection
-import libapp.tab_analyse_ia   as tab_analyse_ia
 import libapp.tab_tableaux     as tab_tableaux
 import libapp.tab_graphiques   as tab_graphiques
+import libapp.tab_historique   as tab_historique
 import libapp.tab_contexte     as tab_contexte
-import libapp.tab_methodologie as tab_methodologie
 
 widgets.inject_css()
 
-st.title("Outil de Diagnostic Territorial")
+
+st.title("Exploration Territoriale")
 
 # ── Chargement des données de session ────────────────────────────────────────
 try:
@@ -50,20 +50,16 @@ if not territoire_pret:
     st.info("👈 Sélectionnez un territoire dans la barre latérale pour démarrer l'analyse.")
 
 else:
-    tab_sel, tab_ia, tab_tab, tab_graph, tab_ctx, tab_meth = st.tabs([
+    tab_sel, tab_evol, tab_ctx, tab_tab, tab_graph = st.tabs([
         "🗺️ Carte",
-        "🤖 Analyse IA",
+        "📉 Evolution",
+        "👥 Contexte socio-éco",
         "📊 Tableaux",
         "📈 Graphiques",
-        "👥 Contexte socio-éco (IRIS)",
-        "📚 Méthodologie",
     ])
 
     with tab_sel:
         tab_selection.render_map()
-
-    with tab_ia:
-        tab_analyse_ia.render()
 
     with tab_tab:
         tab_tableaux.render()
@@ -71,8 +67,8 @@ else:
     with tab_graph:
         tab_graphiques.render()
 
+    with tab_evol:
+        tab_historique.render()
+
     with tab_ctx:
         tab_contexte.render()
-
-    with tab_meth:
-        tab_methodologie.render()

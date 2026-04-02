@@ -133,41 +133,29 @@ def load_fdep():
     """Indicateurs sociaux FDEP par IRIS."""
     return pd.read_parquet(DATA_DIR / 'app_fdep_utile.parquet')
 
+# ─── DISTANCES ───────────────────────────────────────────────────────────────
+
+def haversine_km(lat0: float, lon0: float, lats: np.ndarray, lons: np.ndarray) -> np.ndarray:
+    """Distance haversine en km entre un point (lat0, lon0) et un tableau de points."""
+    R = 6371.0
+    dlat = np.radians(lats - lat0)
+    dlon = np.radians(lons - lon0)
+    a = np.sin(dlat / 2)**2 + np.cos(np.radians(lat0)) * np.cos(np.radians(lats)) * np.sin(dlon / 2)**2
+    return R * 2 * np.arcsin(np.sqrt(a))
+
+
 # ─── CALCUL COMMUNES ─────────────────────────────────────────────────────────
 
 def calculer_communes_rayon(df_indic, code_insee, rayon_km):
-    # Cas PLM : Paris (75056), Marseille (13055), Lyon (69123)
-    # → pas de ligne dans df_indic, on utilise les arrondissements
-    prefix = PLM_CODES.get(code_insee)
-    if prefix:
-        arr = df_indic[df_indic['code_insee'].str.startswith(prefix)].copy()
-        if len(arr) == 0:
-            return arr, None
-        pop = arr['population'].replace(0, 1)
-        centre = arr.iloc[0].copy()
-        centre['latitude']  = (arr['latitude']  * pop).sum() / pop.sum()
-        centre['longitude'] = (arr['longitude'] * pop).sum() / pop.sum()
-        if rayon_km == 0:
-            arr['distance_km'] = 0.0
-            return arr, centre
-        # rayon > 0 : toutes les communes dans ce rayon autour du centre PLM
-        origine = np.array([[centre['latitude'], centre['longitude']]])
-        pts = df_indic[['latitude', 'longitude']].values
-        distances_km = distance_matrix(origine, pts)[0] * 111
-        mask = distances_km <= rayon_km
-        result = df_indic[mask].copy()
-        result['distance_km'] = distances_km[mask]
-        return result, centre
-
     commune = df_indic[df_indic['code_insee'] == code_insee].iloc[0]
+    # Exclure les communes mères PLM (75056, 13055, 69123) : leurs arrondissements sont déjà dans df_indic
+    df_base = df_indic[~df_indic['code_insee'].isin(PLM_CODES.keys())]
     if rayon_km == 0:
-        result = df_indic[df_indic['code_insee'] == code_insee].copy()
+        result = df_base[df_base['code_insee'] == code_insee].copy()
         result['distance_km'] = 0.0
         return result, commune
-    df_base = df_indic[~df_indic['code_insee'].isin(PLM_CODES.keys())]
-    origine = np.array([[commune['latitude'], commune['longitude']]])
     pts = df_base[['latitude', 'longitude']].values
-    distances_km = distance_matrix(origine, pts)[0] * 111
+    distances_km = haversine_km(commune['latitude'], commune['longitude'], pts[:, 0], pts[:, 1])
     mask = distances_km <= rayon_km
     result = df_base[mask].copy()
     result['distance_km'] = distances_km[mask]
@@ -232,4 +220,4 @@ def calculer_score_apl(communes):
     return float(np.nanmean(scores)) if scores else np.nan
 
 def score_apl_par_commune(communes):
-    return communes[APL_STD_COLS].mul([0.35, 0.15, 0.25, 0.20, 0.05]).sum(axis=1)
+    return communes[APL_STD_COLS].mul([0.35, 0.15, 0.25, 0.20, 0.05]).sum(axis=1, min_count=len(APL_STD_COLS))

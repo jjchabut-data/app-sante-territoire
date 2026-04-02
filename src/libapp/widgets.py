@@ -3,12 +3,13 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 from libapp.config import (
-    APL_COLS, APL_STD_COLS, APL_LABELS, COLOR_MAP, APL_SEUILS,
+    APL_COLS, APL_STD_COLS, APL_LABELS, COLOR_MAP,
     CLUSTER_COLORS_HEX, CLUSTER_NAMES, N_CLUSTERS,
     QUINTILE_LABELS, QUINTILE_COLORS, _THEME_TO_QUINTILE,
-    THEMATIQUE_OPTIONS, _VIRIDIS_STOPS,
+    THEMATIQUE_OPTIONS,
 )
-from libapp.utils import viridis_hex, score_apl_par_commune, load_clusters
+from libapp.utils import viridis_hex, load_clusters
+from libapp.territoire import calcul_heterogeneite, _profil_heterogeneite, _badge_perenite_from_taux, note_croisee_perenite
 
 
 RADAR_OFFSET = 3
@@ -46,20 +47,30 @@ def _repartition_html(labels, counts, colors, max_bar_px=80):
     return ''.join(lines)
 
 
-def _indice_html(label, indice, max_bar_px=80):
-    """Ligne HTML : Profession  ████░  X.X / 5  Niveau — même style que _repartition_html."""
+def _indice_html(label, indice, max_bar_px=80, tendance=None):
+    """Ligne HTML : Profession  ████░  X.X / 5  Niveau  ↑/→/↓ colorée."""
+    _TEND_ARROW = {
+        "amélioration": ("↑", "#0dc735"),
+        "stable":       ("→", "#f0a500"),
+        "dégradation":  ("↓", "#dc322f"),
+        "situation mixte": ("↕", "#888888"),
+    }
     if indice is None or (isinstance(indice, float) and np.isnan(indice)):
         return f'<div style="display:flex;align-items:center;margin:3px 0;font-size:0.82rem;"><span style="min-width:140px;white-space:nowrap;">{label}</span>N/A</div>'
     q_round = max(1, min(5, round(indice)))
     color   = QUINTILE_COLORS[q_round]
     label_q = QUINTILE_LABELS[q_round]
     bar_w   = max(2, int((indice - 1) / 4 * max_bar_px))
+    arrow_html = ""
+    if tendance and tendance in _TEND_ARROW:
+        arrow, arrow_color = _TEND_ARROW[tendance]
+        arrow_html = f'<span style="color:{arrow_color};font-weight:700;margin-left:6px">{arrow}</span>'
     return (
         f'<div style="display:flex;align-items:center;margin:3px 0;font-size:0.82rem;">'
         f'<span style="min-width:140px;white-space:nowrap;">{label}</span>'
         f'<span style="display:inline-block;width:{bar_w}px;height:10px;'
         f'background:{color};border-radius:2px;margin-right:6px;flex-shrink:0;"></span>'
-        f'{indice:.1f} / 5&nbsp;&nbsp;{label_q}'
+        f'{indice:.1f} / 5&nbsp;&nbsp;{label_q}{arrow_html}'
         f'</div>'
     )
 
@@ -98,12 +109,14 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
     _, _, _, _, force_msg = _niveau_apl(apl)
     apl_str = f"{apl:.2f}" if not np.isnan(apl) else "N/A"
 
-    st.session_state["res"]              = res
+    st.session_state["res"]               = res
     st.session_state["communes_affichees"] = communes_affichees
-    st.session_state["apl"]              = apl
-    st.session_state["apl_moyens"]       = apl_moyens
-    st.session_state["apl_std_moyens"]   = apl_std_moyens
-    st.session_state["force_msg"]        = force_msg
+    st.session_state["apl"]               = apl
+    st.session_state["apl_moyens"]        = apl_moyens
+    st.session_state["apl_std_moyens"]    = apl_std_moyens
+    st.session_state["indice_position"]        = res.get("indice_position", {})
+    st.session_state["indice_position_labels"] = res.get("indice_position_labels", {})
+    st.session_state["force_msg"]              = force_msg
 
 
     if score_apl_range is not None and not np.isnan(apl):
@@ -111,14 +124,14 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
     else:
         couleur_apl, *_ = _niveau_apl(apl)
 
-    titre = res['territoire_label']
-    if res['type_terr'] == 'comm' and res.get('rayon_km') is not None:
-        titre += f" — Rayon {res['rayon_km']} km"
-    st.markdown(f"## {titre}")
-
-    col_left, col_radar = st.columns([3, 1.5])
+    col_left, col_radar = st.columns([3, 1.2])
 
     with col_left:
+        
+        titre = res['territoire_label']
+        if res['type_terr'] == 'comm' and res.get('rayon_km') is not None:
+            titre += f" — Rayon {res['rayon_km']} km"
+        st.markdown(f"## {titre}")
 
         col_insee, col_indic = st.columns([1, 1])
         with col_insee:
@@ -145,7 +158,40 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
                     label_visibility="collapsed", key="thematique_radio")
             theme_key = THEMATIQUE_OPTIONS[thematique_label]
 
-        with st.expander("Répartition des communes", expanded=False):
+    with col_radar:
+        if nb_communes > 1:
+            _radar_key = f"radar_{nb_communes}_{round(sum((apl_std_moyens.get(c) or 0) for c in APL_STD_COLS), 4)}"
+            st.plotly_chart(creer_radar(apl_std_moyens), use_container_width=True,
+                            config={'displayModeBar': False}, key=_radar_key)
+
+    # ── Hétérogénéité ─────────────────────────────────────────────────────
+    h = calcul_heterogeneite(communes_affichees)
+    profil = _profil_heterogeneite(h)
+    st.session_state["heterogeneite"] = h
+    st.session_state["profil_heterogeneite"] = profil
+
+    # ── Pérennité ─────────────────────────────────────────────────────────
+    _PERENITE_COLORS = {
+        "Offre résiliente":         "#0dc735",
+        "Offre modérément exposée": "#f0a500",
+        "Offre fragile":            "#dc322f",
+    }
+    taux_moy = badge_p = badge_color_p = None
+    if "apl_med_60" in communes_affichees.columns and "apl_medecins" in communes_affichees.columns:
+        valides = communes_affichees["apl_medecins"].notna() & (communes_affichees["apl_medecins"] > 0) & communes_affichees["apl_med_60"].notna()
+        if valides.sum() > 0:
+            poids_p   = communes_affichees.loc[valides, "population"]
+            taux_c    = communes_affichees.loc[valides, "apl_med_60"] / communes_affichees.loc[valides, "apl_medecins"]
+            taux_moy  = float(np.average(taux_c, weights=poids_p))
+            badge_p   = _badge_perenite_from_taux(taux_moy)
+            badge_color_p = _PERENITE_COLORS.get(badge_p, "#C2C5C6")
+
+    with st.expander("Décryptage", expanded=False):
+        # ── Ligne 1 : Répartition | Hétérogénéité ─────────────────────────
+        col_gauche, col_droite = st.columns(2)
+
+        with col_gauche:
+            st.markdown("**Répartition des communes**")
             if theme_key == 'cluster':
                 df_cl = load_clusters()
                 cl_map = dict(zip(df_cl['code_insee'], df_cl['cluster']))
@@ -155,7 +201,6 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
                              for i, name in CLUSTER_NAMES.items()]
                 st.markdown(_repartition_html(labels_cl, counts_cl, CLUSTER_COLORS_HEX),
                             unsafe_allow_html=True)
-
             else:
                 q_col = _THEME_TO_QUINTILE.get(theme_key)
                 if q_col and q_col in communes_affichees.columns:
@@ -166,28 +211,108 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
                     st.markdown(_repartition_html(labels_q, counts_q, colors_q),
                                 unsafe_allow_html=True)
 
-        with st.expander("Offre de soins par profession", expanded=False):
+        with col_droite:
+            if h:
+                st.markdown("**Hétérogénéité du territoire**")
+                _PROFIL_COLORS = {
+                    "Homogène bien pourvu": "#0dc735",
+                    "Homogène mal pourvu":  "#a160cf",
+                    "Polarisé":             "#dc322f",
+                    "Intermédiaire mixte":  "#41b6c4",
+                }
+                badge_color = _PROFIL_COLORS.get(profil, "#C2C5C6")
+                st.markdown(
+                    f"<span style='background:{badge_color};color:white;"
+                    f"padding:2px 8px;border-radius:4px;font-size:0.85rem'>"
+                    f"<strong>{profil}</strong></span>",
+                    unsafe_allow_html=True,
+                )
+                nb_q1        = h.get('nb_communes_q1', 0)
+                nb_total     = h.get('nb_communes_total', 1)
+                part_comm_q1 = nb_q1 / nb_total if nb_total else 0
+                part_pop_q1  = h.get('part_pop_q1', 0)
+                note_html = ""
+                if nb_q1 > 0 and part_pop_q1 > 0 and part_comm_q1 > part_pop_q1 * 2:
+                    note_html = (
+                        f"<div style='font-size:0.75rem;color:gray;margin-top:4px'>"
+                        f"ℹ️ {nb_q1} communes en faible accessibilité (Q1), "
+                        f"mais seulement {part_pop_q1*100:.1f}% de la population concernée.</div>"
+                    )
+                st.markdown(
+                    f"<div style='display:flex;gap:2rem;margin-top:6px'>"
+                    f"<div><div style='font-size:0.75rem;color:gray'>Pop. en sous-accès (Q1)</div>"
+                    f"<div style='font-size:1.1rem;font-weight:600'>{part_pop_q1*100:.1f}%</div></div>"
+                    f"<div><div style='font-size:0.75rem;color:gray'>Pop. en très bon accès (Q5)</div>"
+                    f"<div style='font-size:1.1rem;font-weight:600'>{h['part_pop_q5']*100:.1f}%</div></div>"
+                    f"</div>{note_html}",
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("---")
+
+        # ── Ligne 2 : Offre de soins | Pérennité ──────────────────────────
+        col_gauche2, col_droite2 = st.columns(2)
+
+        with col_gauche2:
+            st.markdown("**Offre de soins par profession**")
+            # Tendances depuis session_state (calculées dans tab_historique)
+            _APL_TO_TEND_KEY = {
+                "apl_medecins":   "medecins",
+                "apl_infirmiers": "infirmiers",
+                "apl_kines":      "kines",
+                "apl_sagefemmes": "sagefemmes",
+            }
+            _tend_data = st.session_state.get("tendance_apl", {})
             lines = []
             for col_name, label in zip(APL_COLS, APL_LABELS):
                 q_col = _THEME_TO_QUINTILE.get(col_name)
                 if q_col and q_col in communes_affichees.columns:
                     valides = communes_affichees[q_col].notna()
                     if valides.sum() > 0:
-                        poids = communes_affichees.loc[valides, 'population']
-                        vals  = communes_affichees.loc[valides, q_col]
+                        poids  = communes_affichees.loc[valides, 'population']
+                        vals   = communes_affichees.loc[valides, q_col]
                         indice = float(np.average(vals, weights=poids))
                     else:
                         indice = np.nan
                 else:
                     indice = np.nan
-                lines.append(_indice_html(label, indice))
+                tend_key = _APL_TO_TEND_KEY.get(col_name)
+                tendance = _tend_data.get(tend_key, {}).get("tendance") if tend_key else None
+                lines.append(_indice_html(label, indice, tendance=tendance))
             st.markdown(''.join(lines), unsafe_allow_html=True)
 
-    with col_radar:
-        if nb_communes > 1:
-            _radar_key = f"radar_{nb_communes}_{round(sum((apl_std_moyens.get(c) or 0) for c in APL_STD_COLS), 4)}"
-            st.plotly_chart(creer_radar(apl_std_moyens), use_container_width=True,
-                            config={'displayModeBar': False}, key=_radar_key)
+        with col_droite2:
+            if taux_moy is not None:
+                st.markdown("**Pérennité de l'offre médicale**")
+                st.markdown(
+                    f"<span style='background:{badge_color_p};color:white;"
+                    f"padding:2px 8px;border-radius:4px;font-size:0.85rem'>"
+                    f"<strong>{badge_p}</strong></span>",
+                    unsafe_allow_html=True,
+                )
+                if "quintile_apl_nat" in communes_affichees.columns:
+                    _q = pd.to_numeric(communes_affichees["quintile_apl_nat"], errors="coerce")
+                    _w = communes_affichees["population"]
+                    _valid = _q.notna() & _w.notna()
+                    q_apl_moy = float(np.average(_q[_valid], weights=_w[_valid])) if _valid.sum() > 0 else None
+                else:
+                    q_apl_moy = None
+                note_p = note_croisee_perenite(taux_moy, q_apl_moy)
+                note_p_html = (
+                    f"<div style='font-size:0.75rem;color:gray;margin-top:4px'>⚠️ {note_p}</div>"
+                    if note_p else ""
+                )
+                st.markdown(
+                    f"<div style='margin-top:6px'>"
+                    f"<div style='font-size:0.75rem;color:gray'>Taux de pérennité (médecins ≤ 60 ans)</div>"
+                    f"<div style='font-size:1.1rem;font-weight:600'>{taux_moy*100:.1f}%</div>"
+                    f"<div style='font-size:0.75rem;color:gray;margin-top:4px'>"
+                    f"ℹ️ Part de l'offre médicale portée par des médecins de 60 ans et moins. "
+                    f"Proche de 100\u202f% = territoire résilient aux départs en retraite.</div>"
+                    f"{note_p_html}"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
 
     return theme_key
 
@@ -207,6 +332,7 @@ p, li, div[data-testid="stMarkdownContainer"] {
 [data-testid="stMetricLabel"] { font-size: 0.8rem !important; }
 [data-testid="stMetricValue"] { font-size: 1.1rem !important; }
 [data-testid="stPlotlyChart"] { margin-top: -1rem !important; margin-bottom: -1rem !important; }
+[data-testid="stExpander"] { margin-top: -3rem !important; }
 [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child > div:first-child {
     margin-top: -1rem !important;
     padding-top: 0 !important;
@@ -260,9 +386,8 @@ def creer_radar(apl_std_moyens):
             radialaxis=dict(visible=True, range=[0, scale_max], showticklabels=False),
             angularaxis=dict(tickfont=dict(size=10)),
         ),
-        showlegend=True,
-        legend=dict(orientation='h', y=-0.18, x=0.5, xanchor='center', font=dict(size=10)),
-        height=240,
-        margin=dict(l=40, r=40, t=20, b=50),
+        showlegend=False,
+        height=200,
+        margin=dict(l=33, r=33, t=17, b=17),
     )
     return fig

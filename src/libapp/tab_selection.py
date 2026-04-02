@@ -80,14 +80,21 @@ def setup_sidebar(df_indic, ref) -> bool:
         row = ref_filtered[ref_filtered['label'] == territoire_label].iloc[0]
         with st.spinner("Calcul en cours…"):
             terr = Territoire.depuis_ref(row, rayon_km or 0).calculer(df_indic)
-        if len(terr.communes) == 0:
+        if terr.nb_communes == 0:
             st.warning("Aucune commune trouvée pour ce territoire.")
             return False
         mk = st.session_state.get('multiselect_key', 0) + 1
         st.session_state['multiselect_key'] = mk
-        st.session_state['resultats'] = terr.vers_resultats()
-        st.session_state['selected_codes'] = set(terr.communes['code_insee'])
+        st.session_state['resultats']  = terr.vers_resultats()
+        st.session_state['territoire'] = terr
+        st.session_state['selected_codes'] = set(terr.codes_communes)
+        df_hist = st.session_state.get("df_historique")
+        if df_hist is not None and not df_hist.empty:
+            st.session_state['tendance_apl'] = terr.tendance(df_hist)
+        else:
+            st.session_state.pop('tendance_apl', None)
         st.session_state['_sel_terr'] = row['code']
+        st.session_state.pop(f"map_view_{row['code']}", None)
 
     if 'resultats' not in st.session_state:
         return False
@@ -175,7 +182,6 @@ def render_map():
     # ── Header ─────────────────────────────────────────────────────────────
     theme_key = widgets.afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
                     score_apl_range=score_apl_range)
-    st.markdown("<div style='margin-top:-6rem'></div>", unsafe_allow_html=True)
 
     # ── Préparation df_map ─────────────────────────────────────────────────
     communes_carte = res['communes_terr']
@@ -222,17 +228,6 @@ def render_map():
     if theme_col in df_map.columns:
         df_map[theme_col] = df_map[theme_col].round(2)
 
-    # ── Context bounds ──────────────────────────────────────────────────────
-    context_bounds = None
-    if res['type_terr'] in ('comm', 'epci'):
-        from shapely.geometry import box as _box
-        gdf_d = utils.load_geom_dept()
-        tb = df_map.total_bounds
-        terr_box = _box(tb[0], tb[1], tb[2], tb[3])
-        depts_sel = gdf_d[gdf_d.intersects(terr_box)]
-        if len(depts_sel) > 0:
-            context_bounds = depts_sel.total_bounds
-
     # ── Légende + Carte ────────────────────────────────────────────────────
     widgets.afficher_legende_gradient(vmin, vmax, theme_col)
 
@@ -247,7 +242,7 @@ def render_map():
         view_key=f"map_view_{res.get('code_sel', '')}",
     )
 
-    st.caption("Échelle de couleur calée sur les **p2–p98 nationaux** — indépendante du territoire affiché.")
+    # st.caption("Échelle de couleur calée sur les **p2–p98 nationaux** — indépendante du territoire affiché.")
 
 
 def render(df_indic, ref):
