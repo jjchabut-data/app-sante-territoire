@@ -1,6 +1,27 @@
 version: 2
 
 models:
+  - name: mart_apl_historique
+    description: >
+      Historique APL par commune (2017, 2019, 2022, 2023) pour les 4 professions
+      comparables (sans dentistes), enrichi du contexte géographique.
+      COG harmonisé 2026. Pondération par population standardisée disponible
+      pour les agrégations territoriales.
+    columns:
+      - name: code_commune
+        tests:
+          - not_null
+      - name: annee
+        tests:
+          - not_null
+          - accepted_values:
+              values: [2017, 2019, 2022, 2023]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - code_commune
+            - annee
+
   - name: mart_apl_commune
     description: "{{ doc('mart_apl_commune') }}"
     columns:

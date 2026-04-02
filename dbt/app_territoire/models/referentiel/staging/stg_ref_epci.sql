@@ -1,4 +1,4 @@
--- referentiel/staging/stg_epci.sql
+-- referentiel/staging/stg_ref_epci.sql
 with source as (
     select * from {{ source('raw', 'ref_epci_geom_2026') }}
 ),
@@ -10,8 +10,8 @@ renamed as (
         nature                              as type_epci,
         codes_insee_des_communes_membres    as codes_communes_membres,
         codes_insee_des_departements_membres as codes_departements_membres,
-        lon,
-        lat,
+        lon                             as longitude,
+        lat                             as latitude,
         geometry
     from source
     where code_siren is not null

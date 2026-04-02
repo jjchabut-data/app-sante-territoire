@@ -14,6 +14,13 @@ with apl as (
         apl_med_60,
         quintile_med_60,
         quintile_label_med_60,
+        offre_med_65_plus,
+        offre_med_63_64,
+        offre_med_61_62,
+        offre_med_perenite,
+        taux_perenite_offre,
+        quintile_perenite_offre,
+        quintile_label_perenite_offre,
         apl_dentistes,
         quintile_dentistes,
         quintile_label_dentistes,
@@ -37,7 +44,7 @@ with apl as (
         score_apl,
         score_apl_std,
         quintile_apl_nat
-    from {{ ref('int_apl_current_all') }}
+    from {{ ref('int_apl_allprofs_current') }}
 ),
 
 communes as (
@@ -93,6 +100,13 @@ final as (
         a.apl_med_60,
         a.quintile_med_60,
         a.quintile_label_med_60,
+        a.offre_med_65_plus,
+        a.offre_med_63_64,
+        a.offre_med_61_62,
+        a.offre_med_perenite,
+        a.taux_perenite_offre,
+        a.quintile_perenite_offre,
+        a.quintile_label_perenite_offre,
         a.apl_dentistes,
         a.quintile_dentistes,
         a.quintile_label_dentistes,

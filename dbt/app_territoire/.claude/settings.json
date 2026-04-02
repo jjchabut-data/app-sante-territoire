@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dbt run:*)",
+      "Read(//Users/jean-jacques/code/jjchabutData/app-sante-territoire/src/pages/**)",
+      "Read(//Users/jean-jacques/code/jjchabutData/app-sante-territoire/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/jean-jacques/code/jjchabutData/app-sante-territoire/src/libapp",
+      "/Users/jean-jacques/code/jjchabutData/app-sante-territoire/src",
+      "/Users/jean-jacques/code/jjchabutData/app-sante-territoire/POC/api"
+    ]
+  }
+}

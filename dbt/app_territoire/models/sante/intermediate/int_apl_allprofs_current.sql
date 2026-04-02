@@ -1,6 +1,8 @@
--- sante/intermediate/int_apl_current_all.sql
+-- sante/intermediate/int_apl_allprofs_current.sql
 select
     code_commune,
+
+    pop_std_med,
     apl_medecins,
     apl_medecins_std,
     quintile_medecins,
@@ -17,23 +19,39 @@ select
     apl_med_60_std,
     quintile_med_60,
     quintile_label_med_60,
+    offre_med_65_plus,
+    offre_med_63_64,
+    offre_med_61_62,
+    offre_med_perenite,
+    taux_perenite_offre,
+    quintile_perenite_offre,
+    quintile_label_perenite_offre,
+
+    pop_std_dentiste,
     apl_dentistes,
     apl_dentistes_std,
     quintile_dentistes,
     quintile_label_dentistes,
+
+    pop_std_infirmier,
     apl_infirmiers,
     apl_infirmiers_std,
     quintile_infirmiers,
     quintile_label_infirmiers,
+
+    pop_std_kine,
     apl_kines,
     apl_kines_std,
     quintile_kines,
     quintile_label_kines,
+
+    pop_std_sagefemme,
     apl_sagefemmes,
     apl_sagefemmes_std,
     quintile_sagefemmes,
     quintile_label_sagefemmes,
+
     score_apl,
     score_apl_std,
     quintile_apl_nat
-from {{ ref('int_apl_' ~ var('annee_apl') ~ '_all') }}
+from {{ ref('int_apl_allprofs_' ~ var('annee_apl')) }}

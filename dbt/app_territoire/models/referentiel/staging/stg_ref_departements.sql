@@ -1,4 +1,4 @@
--- referentiel/staging/stg_departements.sql
+-- referentiel/staging/stg_ref_departements.sql
 with source as (
     select * from {{ source('raw', 'ref_dept_geom_2026') }}
 ),
@@ -8,8 +8,8 @@ renamed as (
         code_insee                  as code_departement,
         nom_officiel                as nom_departement,
         code_insee_de_la_region     as code_region,
-        lon,
-        lat,
+        lon                         as longitude,
+        lat                         as latitude,
         geometry
     from source
     where code_insee is not null

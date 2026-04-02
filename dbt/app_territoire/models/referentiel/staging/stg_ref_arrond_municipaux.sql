@@ -11,8 +11,8 @@ renamed as (
         code_insee_de_la_commune_de_rattach as code_commune_rattachement,
         population,
         code_postal,
-        lon,
-        lat,
+        lon                             as longitude,
+        lat                             as latitude,
         geometry
     from source
     where code_insee is not null

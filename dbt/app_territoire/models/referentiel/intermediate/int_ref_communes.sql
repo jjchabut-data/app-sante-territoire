@@ -1,4 +1,4 @@
--- referentiel/marts/int_ref_communes.sql
+-- referentiel/intermediate/int_ref_communes.sql
 with communes as (
     select
         code_commune as code,
