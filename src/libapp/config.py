@@ -59,11 +59,13 @@ Contraintes :
 - Ne redonne pas les valeurs d'indicateurs.
 - Ne parle pas de score.
 - Évite les répétitions.
+- Si le profil d'hétérogénéité est notable (polarisé ou fortement inégal), mentionne-le brièvement.
 
 Analyse dans cet ordre :
 1. situation globale du territoire
 2. professions bien dotées
 3. professions moins bien dotées
+4. hétérogénéité interne si pertinente
 
 Si aucune profession n'est en déficit notable, indique que l'offre apparaît globalement équilibrée.
 
@@ -73,6 +75,7 @@ Indice global APL : {apl} — {force_msg}
 
 Dotation par profession par rapport à la moyenne nationale :
 {lignes_professions}
+Hétérogénéité interne : {heterogeneite}
 """
 
 COLOR_MAP = {
@@ -83,6 +86,17 @@ COLOR_MAP = {
     'Purple':      "#a160cf",
     'Grey':        '#C2C5C6',
 }
+
+PARQUET_HISTORIQUE = DATA_DIR / "mart_apl_historique.parquet"
+
+# ─── TENDANCE ────────────────────────────────────────────────────────────────
+
+TENDANCE_NATIONALE = -0.06   # ~-1%/an sur 6 ans — référence DREES
+MARGE              = 0.05    # ±5 points autour de la tendance nationale
+
+SEUIL_DEGRADATION  = TENDANCE_NATIONALE - MARGE   # -0.11 : < -11% → dégradation
+SEUIL_AMELIORATION = TENDANCE_NATIONALE + MARGE   # -0.01 : > -1%  → amélioration
+SEUIL_POP_HAUSSE   = 0.02                         #  +2%  : hausse démographique significative
 
 APL_COLS     = ['apl_medecins', 'apl_dentistes', 'apl_infirmiers', 'apl_kines', 'apl_sagefemmes']
 APL_STD_COLS = ['apl_medecins_std', 'apl_dentistes_std', 'apl_infirmiers_std', 'apl_kines_std', 'apl_sagefemmes_std']

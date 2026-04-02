@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import pandas as pd; df = pd.read_parquet\\(''data/final/mart_sante_comm_indic.parquet''\\); print\\(list\\(df.columns\\)\\)\")",
+      "Bash(python3 -c \":*)",
+      "Bash(pip install:*)",
+      "Bash(python3 -c ':*)",
+      "Bash(gcloud config:*)",
+      "Bash(docker build:*)",
+      "Read(//Applications/**)",
+      "Bash(gcloud auth:*)",
+      "Bash(curl -s \"https://api-territoire-sante-466874007325.europe-west1.run.app/territoires/search?q=Cantal&type=departement\")",
+      "Bash(gcloud run:*)"
+    ]
+  }
+}

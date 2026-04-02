@@ -1,0 +1,45 @@
+.gcloudignore
+.git
+.gitignore
+.python-version
+.claude/
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# POC et dev
+POC/
+notebooks/
+docs/
+
+# Données inutiles pour le build Docker
+# (seuls data/final/mart_sante_comm_indic + mart_apl_historique sont nécessaires)
+data/raw/
+data/marts/
+data/final/app_communes_geom_simplified.parquet
+data/final/app_fdep_utile.parquet
+data/final/commune_clusters.parquet
+data/final/departements_geom_simplified.parquet
+data/final/epci_geom_simplified.parquet
+data/final/ref_app_territoires.parquet
+data/final/ref_iris_habitat_geom_simplified.parquet
+data/final/regions_geom_simplified.parquet
+
+# App Streamlit (inutile pour l'API)
+src/pages/
+src/app.py
+src/pipeline/
+
+# Secrets
+.streamlit/secrets.toml
+config.yaml
+
+# dbt
+dbt/
+
+# Divers
+*.md
+requirements.txt

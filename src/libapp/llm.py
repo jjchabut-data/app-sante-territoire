@@ -8,19 +8,38 @@ from libapp.config import SYSTEM_PROMPT, ANALYSE_TEMPLATE, APL_LABELS, APL_STD_C
 # Builders
 # ---------------------------------------------------------------------------
 
-def build_prompt(territoire, nb_communes, population, apl, force_msg, apl_std_moyens):
+_PROFESSION_LABELS = {
+    "medecin":    "Médecins",
+    "dentiste":   "Dentistes",
+    "infirmier":  "Infirmiers",
+    "kine":       "Kinésithérapeutes",
+    "sage_femme": "Sages-femmes",
+}
+
+
+def build_prompt(territoire, nb_communes, population, apl, force_msg,
+                 indice_position, indice_position_labels, heterogeneite=None):
     lignes_professions = ""
-    for col_std, label in zip(APL_STD_COLS, APL_LABELS):
-        val_std = apl_std_moyens.get(col_std, np.nan)
-        if val_std is None:
-            val_std = np.nan
-        if not np.isnan(val_std):
-            interpretation = (
-                "bien doté par rapport à la moyenne nationale"
-                if val_std > 0
-                else "moins bien doté que la moyenne nationale"
-            )
-            lignes_professions += f"- {label} : {interpretation} (score : {val_std:+.2f})\n"
+    for cle, label in _PROFESSION_LABELS.items():
+        indice = indice_position.get(cle)
+        interp = indice_position_labels.get(cle)
+        if indice is not None and not np.isnan(indice) and interp:
+            lignes_professions += f"- {label} : {interp} (indice {indice:.1f}/5)\n"
+
+    h = heterogeneite or {}
+    from libapp.territoire import _profil_heterogeneite
+    profil = _profil_heterogeneite(h)
+    if h and isinstance(h.get('cv_apl'), float):
+        heterogeneite_str = (
+            f"{profil} — "
+            f"{h.get('part_pop_q1', 0)*100:.0f}% de la population en sous-accès (Q1), "
+            f"{h.get('part_pop_q5', 0)*100:.0f}% en bon accès (Q5), "
+            f"CV={h['cv_apl']:.2f}"
+        )
+    elif h:
+        heterogeneite_str = f"{profil} — données partielles"
+    else:
+        heterogeneite_str = "données indisponibles"
 
     return ANALYSE_TEMPLATE.format(
         territoire=territoire,
@@ -29,6 +48,7 @@ def build_prompt(territoire, nb_communes, population, apl, force_msg, apl_std_mo
         apl=f"{apl:.2f}" if not np.isnan(apl) else "N/A",
         force_msg=force_msg,
         lignes_professions=lignes_professions,
+        heterogeneite=heterogeneite_str,
     )
 
 
@@ -70,13 +90,17 @@ def _chat_ollama(prompt: str, model: str):
 # ---------------------------------------------------------------------------
 
 def generate_analyse(territoire, nb_communes, population, apl, force_msg,
-                     apl_std_moyens, moteur: str, selected_model: str = None):
+                     indice_position, indice_position_labels,
+                     moteur: str, selected_model: str = None,
+                     heterogeneite: dict = None):
     """
     Génère une analyse IA pour un territoire.
     Retourne (texte, usage) où usage = {"input_tokens": int, "output_tokens": int}
     moteur : "Anthropic (Cloud)" | "Ollama (Local)"
     """
-    prompt = build_prompt(territoire, nb_communes, population, apl, force_msg, apl_std_moyens)
+    prompt = build_prompt(territoire, nb_communes, population, apl, force_msg,
+                          indice_position, indice_position_labels,
+                          heterogeneite=heterogeneite)
 
     if moteur == "Anthropic (Cloud)":
         return _chat_anthropic(prompt)

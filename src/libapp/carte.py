@@ -253,7 +253,7 @@ def _render_folium(df_map, res, theme_col, vmin, vmax, fill_opacity, tiles,
         else:
             v = val_map.get(code)
             color = colormap(max(vmin, min(vmax, float(v)))) if pd.notna(v) else "#cccccc"
-        return {"fillColor": color, "fillOpacity": fill_opacity, "color": "#505050", "weight": 0.8}
+        return {"fillColor": color, "fillOpacity": fill_opacity, "color": "#888888", "weight": 0.5}
 
     tooltip_fields  = ["nom_commune", theme_col, "population"]
     tooltip_aliases = ["Commune", theme_col.replace("_", " ").title(), "Population"]

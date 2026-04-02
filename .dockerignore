@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.python-version
+
+# Dev / POC
+POC/
+notebooks/
+docs/
+
+# Data brute (on copie uniquement ce dont l'API a besoin)
+data/raw/
+data/marts/
+
+# Streamlit app (pas dans l'image API)
+src/pages/
+src/app.py
+src/pipeline/
+
+# Secrets
+.streamlit/secrets.toml
+config.yaml
+
+# dbt
+dbt/
+
+# Divers
+.DS_Store
+*.md
