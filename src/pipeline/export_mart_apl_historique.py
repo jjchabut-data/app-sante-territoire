@@ -1,10 +1,10 @@
 """
-export_mart_apl_commune.py
-Export de mart_apl_commune depuis BigQuery vers parquet.
+export_mart_apl_historique.py
+Export de mart_apl_historique depuis BigQuery vers parquet.
 
 Usage :
-    python export_mart_apl_commune.py
-    python export_mart_apl_commune.py --env prod
+    python export_mart_apl_historique.py
+    python export_mart_apl_historique.py --env prod
 """
 
 import argparse
@@ -16,15 +16,12 @@ from pathlib import Path
 # Config
 # ---------------------------------------------------------------------------
 PROJECT_ID = "app-territoire"
-OUTPUT_DIR = Path(__file__).resolve().parents[2] / "data" / "final"
+OUTPUT_PATH = Path(__file__).parent.parent.parent / "data" / "final" / "mart_apl_historique.parquet"
 
 DATASETS = {
     "dev":  "dbt_dev_mart",
     "prod": "dbt_prod_mart",
 }
-
-TABLE     = "mart_apl_commune"
-OUTPUT_FILE = "mart_sante_comm_indic.parquet"
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -37,24 +34,22 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Fonctions
+# Export
 # ---------------------------------------------------------------------------
 
-def export_mart(dataset: str) -> None:
+def export(dataset: str) -> None:
     from google.cloud import bigquery
-    import pandas as pd
 
-    client = bigquery.Client(project=PROJECT_ID)
-    table_ref = f"`{PROJECT_ID}.{dataset}.{TABLE}`"
+    client    = bigquery.Client(project=PROJECT_ID)
+    table_ref = f"`{PROJECT_ID}.{dataset}.mart_apl_historique`"
 
     log.info(f"Lecture {table_ref}...")
     df = client.query(f"select * from {table_ref}").to_dataframe()
     log.info(f"  → {len(df)} lignes, {len(df.columns)} colonnes")
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = OUTPUT_DIR / OUTPUT_FILE
-    df.to_parquet(output_path, index=False)
-    log.info(f"✅ Exporté dans {output_path} ({output_path.stat().st_size / 1_000_000:.1f} Mo)")
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(OUTPUT_PATH, index=False)
+    log.info(f"✅ Exporté : {OUTPUT_PATH} ({OUTPUT_PATH.stat().st_size / 1_000_000:.1f} Mo)")
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +57,7 @@ def export_mart(dataset: str) -> None:
 # ---------------------------------------------------------------------------
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Export mart_apl_commune → parquet")
+    parser = argparse.ArgumentParser(description="Export mart_apl_historique → parquet")
     parser.add_argument(
         "--env",
         choices=list(DATASETS.keys()),
@@ -74,12 +69,10 @@ def parse_args():
 
 def main():
     args = parse_args()
-    dataset = DATASETS[args.env]
-
     try:
-        export_mart(dataset)
+        export(DATASETS[args.env])
     except Exception as e:
-        log.error(f"Erreur inattendue : {e}")
+        log.error(f"Erreur : {e}")
         sys.exit(1)
 
 
