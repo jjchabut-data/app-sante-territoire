@@ -42,4 +42,4 @@ dbt/
 
 # Divers
 *.md
-requirements.txt
+src/requirements.txt

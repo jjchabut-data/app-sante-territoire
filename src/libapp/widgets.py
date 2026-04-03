@@ -9,7 +9,10 @@ from libapp.config import (
     THEMATIQUE_OPTIONS,
 )
 from libapp.utils import viridis_hex, load_clusters
-from libapp.territoire import calcul_heterogeneite, _profil_heterogeneite, _badge_perenite_from_taux, note_croisee_perenite
+from libapp.territoire import (
+    calcul_heterogeneite, _heterogeneite_spatiale, _niveau_offre,
+    _badge_perenite_from_taux, note_croisee_perenite,
+)
 
 
 RADAR_OFFSET = 3
@@ -32,17 +35,22 @@ def _niveau_apl(apl):
     elif apl < 0.5:     return COLOR_MAP['Green'],     'Moyen',    'correcte',     'proche de la moyenne nationale', 'Accessibilité correcte mais fragile'
     else:               return COLOR_MAP['LightGreen'], 'Bon',     'bonne',        'au-dessus de la moyenne',        'Bonne accessibilité aux soins'
 
-def _repartition_html(labels, counts, colors, max_bar_px=80):
+def _repartition_html(labels, counts, colors, max_bar_px=80, pops=None):
     max_c = max(counts) if any(c > 0 for c in counts) else 1
+    total_pop = sum(pops) if pops else 0
     lines = []
-    for label, count, color in zip(labels, counts, colors):
+    for i, (label, count, color) in enumerate(zip(labels, counts, colors)):
         bar_w = max(2, int(count / max_c * max_bar_px))
+        pop_str = ""
+        if pops and total_pop > 0:
+            pct = pops[i] / total_pop * 100
+            pop_str = f'<span style="color:#888;font-size:0.78rem;margin-left:4px;">({pct:.0f}% pop)</span>'
         lines.append(
             f'<div style="display:flex;align-items:center;margin:3px 0;font-size:0.82rem;">'
             f'<span style="min-width:140px;white-space:nowrap;">{label}</span>'
             f'<span style="display:inline-block;width:{bar_w}px;height:10px;'
             f'background:{color};border-radius:2px;margin-right:6px;flex-shrink:0;"></span>'
-            f'<strong>{count}</strong></div>'
+            f'<strong>{count}</strong>{pop_str}</div>'
         )
     return ''.join(lines)
 
@@ -142,21 +150,13 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
                 unsafe_allow_html=True
             )
         with col_indic:
+            caption_line = force_msg if not np.isnan(apl) else ""
             st.markdown(
-                f"{_circle(couleur_apl)} **Indice d'offre de soins** : {apl_str}",
+                f"<div style='font-size:0.9rem;line-height:1.4'>"
+                f"{_circle(couleur_apl)} <strong>Indice d'offre de soins</strong> : {apl_str}<br/>"
+                f"<span style='color:gray;font-size:0.82rem;'>{caption_line}</span>"
+                f"</div>",
                 unsafe_allow_html=True)
-
-            st.markdown("<br/>", unsafe_allow_html=True)
-        col_analyse, col_theme = st.columns([2, 1])
-        with col_analyse:
-            if not np.isnan(apl):
-                st.markdown(f"<div style='font-size:1.05rem'>{force_msg}</div>", unsafe_allow_html=True)
-        with col_theme:
-            with st.popover("Thématique"):
-                thematique_label = st.radio(
-                    "Thématique", list(THEMATIQUE_OPTIONS.keys()),
-                    label_visibility="collapsed", key="thematique_radio")
-            theme_key = THEMATIQUE_OPTIONS[thematique_label]
 
     with col_radar:
         if nb_communes > 1:
@@ -166,9 +166,11 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
 
     # ── Hétérogénéité ─────────────────────────────────────────────────────
     h = calcul_heterogeneite(communes_affichees)
-    profil = _profil_heterogeneite(h)
+    distribution = _heterogeneite_spatiale(h)
+    niveau = _niveau_offre(h)
     st.session_state["heterogeneite"] = h
-    st.session_state["profil_heterogeneite"] = profil
+    st.session_state["profil_heterogeneite"] = distribution  # compat
+    st.session_state["niveau_offre"] = niveau
 
     # ── Pérennité ─────────────────────────────────────────────────────────
     _PERENITE_COLORS = {
@@ -185,6 +187,8 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
             taux_moy  = float(np.average(taux_c, weights=poids_p))
             badge_p   = _badge_perenite_from_taux(taux_moy)
             badge_color_p = _PERENITE_COLORS.get(badge_p, "#C2C5C6")
+
+    theme_key = st.session_state.get("thematique_key", list(THEMATIQUE_OPTIONS.values())[0])
 
     with st.expander("Décryptage", expanded=False):
         # ── Ligne 1 : Répartition | Hétérogénéité ─────────────────────────
@@ -204,49 +208,51 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
             else:
                 q_col = _THEME_TO_QUINTILE.get(theme_key)
                 if q_col and q_col in communes_affichees.columns:
-                    q_series = pd.to_numeric(communes_affichees[q_col], errors='coerce').dropna().astype(int)
+                    q_series = pd.to_numeric(communes_affichees[q_col], errors='coerce').astype('Int64')
                     counts_q = [int((q_series == q).sum()) for q in range(1, 6)]
                     labels_q = [f"Q{q} {QUINTILE_LABELS[q]}" for q in range(1, 6)]
                     colors_q = [QUINTILE_COLORS[q] for q in range(1, 6)]
-                    st.markdown(_repartition_html(labels_q, counts_q, colors_q),
+                    pops_q = [
+                        int(communes_affichees.loc[q_series == q, 'population'].sum())
+                        for q in range(1, 6)
+                    ]
+                    st.markdown(_repartition_html(labels_q, counts_q, colors_q, pops=pops_q),
                                 unsafe_allow_html=True)
 
         with col_droite:
             if h:
-                st.markdown("**Hétérogénéité du territoire**")
-                _PROFIL_COLORS = {
-                    "Homogène bien pourvu": "#0dc735",
-                    "Homogène mal pourvu":  "#a160cf",
-                    "Polarisé":             "#dc322f",
-                    "Intermédiaire mixte":  "#41b6c4",
+                st.markdown("**Distribution territoriale**")
+                _DISTRIB_COLORS = {
+                    "Concentré Q5":  "#0dc735",
+                    "Concentré Q1":  "#a160cf",
+                    "Polarisé":      "#dc322f",
+                    "Homogène":      "#41b6c4",
+                    "Intermédiaire": "#C2C5C6",
                 }
-                badge_color = _PROFIL_COLORS.get(profil, "#C2C5C6")
-                st.markdown(
-                    f"<span style='background:{badge_color};color:white;"
-                    f"padding:2px 8px;border-radius:4px;font-size:0.85rem'>"
-                    f"<strong>{profil}</strong></span>",
-                    unsafe_allow_html=True,
-                )
-                nb_q1        = h.get('nb_communes_q1', 0)
-                nb_total     = h.get('nb_communes_total', 1)
-                part_comm_q1 = nb_q1 / nb_total if nb_total else 0
-                part_pop_q1  = h.get('part_pop_q1', 0)
-                note_html = ""
-                if nb_q1 > 0 and part_pop_q1 > 0 and part_comm_q1 > part_pop_q1 * 2:
-                    note_html = (
-                        f"<div style='font-size:0.75rem;color:gray;margin-top:4px'>"
-                        f"ℹ️ {nb_q1} communes en faible accessibilité (Q1), "
-                        f"mais seulement {part_pop_q1*100:.1f}% de la population concernée.</div>"
+                _NIVEAU_COLORS = {
+                    "Bien pourvu":        "#0dc735",
+                    "Plutôt bien pourvu": "#6dbf7e",
+                    "Mixte":              "#C2C5C6",
+                    "Plutôt sous-doté":   "#e07b54",
+                    "Sous-doté":          "#a160cf",
+                }
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
+                    st.markdown(
+                        f"<div style='font-size:0.72rem;color:gray;margin-bottom:2px'>Niveau d'offre</div>"
+                        f"<span style='background:{_NIVEAU_COLORS.get(niveau, '#C2C5C6')};color:white;"
+                        f"padding:2px 8px;border-radius:4px;font-size:0.85rem'>"
+                        f"<strong>{niveau}</strong></span>",
+                        unsafe_allow_html=True,
                     )
-                st.markdown(
-                    f"<div style='display:flex;gap:2rem;margin-top:6px'>"
-                    f"<div><div style='font-size:0.75rem;color:gray'>Pop. en sous-accès (Q1)</div>"
-                    f"<div style='font-size:1.1rem;font-weight:600'>{part_pop_q1*100:.1f}%</div></div>"
-                    f"<div><div style='font-size:0.75rem;color:gray'>Pop. en très bon accès (Q5)</div>"
-                    f"<div style='font-size:1.1rem;font-weight:600'>{h['part_pop_q5']*100:.1f}%</div></div>"
-                    f"</div>{note_html}",
-                    unsafe_allow_html=True,
-                )
+                with col_b2:
+                    st.markdown(
+                        f"<div style='font-size:0.72rem;color:gray;margin-bottom:2px'>Distribution</div>"
+                        f"<span style='background:{_DISTRIB_COLORS.get(distribution, '#C2C5C6')};color:white;"
+                        f"padding:2px 8px;border-radius:4px;font-size:0.85rem'>"
+                        f"<strong>{distribution}</strong></span>",
+                        unsafe_allow_html=True,
+                    )
 
         st.markdown("---")
 

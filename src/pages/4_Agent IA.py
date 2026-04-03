@@ -45,12 +45,23 @@ Accès aux soins :
 - indice_position : par profession, échelle 1-5 (plus c'est élevé = mieux doté).
 - indice_position_labels : label arrondi au quintile le plus proche — Très faible / Faible / Moyen / Bon / Très bon.
 
-Hétérogénéité du territoire (profil_heterogeneite) :
-- "Homogène bien pourvu" : majorité de la population en bon accès (Q4-Q5).
-- "Homogène mal pourvu" : majorité en mauvais accès (Q1-Q2).
-- "Polarisé" : coexistence de populations bien et mal dotées — inégalités internes fortes.
-- "Intermédiaire mixte" : situation nuancée.
-IMPORTANT : croise toujours nb_communes_q1 avec part_pop_q1 — si part_pop faible, communes probablement petites et rurales.
+Distribution territoriale — deux dimensions orthogonales :
+
+niveau_offre (niveau global de desserte, pondéré par population) :
+- "Bien pourvu" : Q4+Q5 ≥ 60% de la population.
+- "Plutôt bien pourvu" : Q4+Q5 ≥ 45%.
+- "Mixte" : ni clairement bien ni mal servi.
+- "Plutôt sous-doté" : Q1+Q2 ≥ 45%.
+- "Sous-doté" : Q1+Q2 ≥ 60%.
+
+profil_heterogeneite (distribution spatiale de l'offre entre communes, basé sur Q1 et Q5 individuels) :
+- "Concentré Q5" : part_pop_q5 ≥ 50% — la population est massivement dans le meilleur quintile.
+- "Concentré Q1" : part_pop_q1 ≥ 50% — la population est massivement dans le pire quintile.
+- "Polarisé" : part_pop_q1 ≥ 20% ET part_pop_q5 ≥ 20% — coexistence réelle des extrêmes, inégalités internes fortes.
+- "Homogène" : part_pop_q1 < 15% ET part_pop_q5 < 35% — pas de domination des extrêmes, distribution étalée.
+- "Intermédiaire" : aucune des configurations précédentes.
+
+Exemple : "Bien pourvu + Concentré Q5" avec part_pop_q5=62%, part_pop_q1=6% → territoire bien servi, l'offre est très concentrée sur le meilleur quintile, quelques communes en Q1 mais peu peuplées.
 
 Pérennité de l'offre médicale (perenite_offre) :
 - badge : "Offre résiliente" / "Offre modérément exposée" / "Offre fragile"

@@ -327,9 +327,13 @@ class Territoire:
         """
         return calcul_heterogeneite(self._communes_loaded)
 
+    def niveau_offre(self) -> str:
+        """Badge de niveau global : Bien pourvu | Sous-doté | Plutôt bien pourvu | Plutôt sous-doté | Mixte."""
+        return _niveau_offre(self.heterogeneite())
+
     def profil_heterogeneite(self) -> str:
-        """Badge qualitatif du profil : Homogène bien pourvu | Homogène mal pourvu | Polarisé | Intermédiaire mixte."""
-        return _profil_heterogeneite(self.heterogeneite())
+        """Badge de distribution spatiale : Polarisé | Homogène | Intermédiaire."""
+        return _heterogeneite_spatiale(self.heterogeneite())
 
     # ── Contexte ──────────────────────────────────────────────────────────
 
@@ -567,6 +571,7 @@ class Territoire:
             "codes_departements": self.codes_departements,
             "codes_regions":      self.codes_regions,
             "profil_heterogeneite": self.profil_heterogeneite(),
+            "niveau_offre":         self.niveau_offre(),
             "heterogeneite":        self.heterogeneite(),
             "perenite_offre":       self.perenite_offre(),
         }
@@ -655,7 +660,7 @@ class Territoire:
             pct_comm_q1 = nb_q1 / nb_total * 100 if nb_total else 0
             pct_comm_q5 = nb_q5 / nb_total * 100 if nb_total else 0
             het_str = (
-                f"profil {self.profil_heterogeneite()}, "
+                f"distribution {self.profil_heterogeneite()}, niveau {self.niveau_offre()}, "
                 f"{nb_q1} communes en Q1 ({pct_comm_q1:.0f}% des communes) "
                 f"mais {h.get('part_pop_q1', 0)*100:.0f}% de la population ; "
                 f"{nb_q5} communes en Q5 ({pct_comm_q5:.0f}% des communes) "
@@ -837,9 +842,13 @@ def calcul_heterogeneite(df: pd.DataFrame) -> dict:
         ecart_type_apl = cv_apl = None
 
     nb_total = int(q.notna().sum())
+    part_pop_q1q2 = float(pop_q1q2 / pop_total)
+    part_pop_q4q5 = float(pop_q4q5 / pop_total)
     return {
         "part_pop_q1":        round(part_pop_q1, 3),
         "part_pop_q5":        round(part_pop_q5, 3),
+        "part_pop_q1q2":      round(part_pop_q1q2, 3),
+        "part_pop_q4q5":      round(part_pop_q4q5, 3),
         "nb_communes_q1":     int((q == 1).sum()),
         "nb_communes_q5":     int((q == 5).sum()),
         "nb_communes_total":  nb_total,
@@ -849,46 +858,69 @@ def calcul_heterogeneite(df: pd.DataFrame) -> dict:
     }
 
 
-def _profil_heterogeneite(h: dict) -> str:
-    """Badge qualitatif basé sur la dispersion des quintiles de population.
+def _niveau_offre(h: dict) -> str:
+    """Badge de niveau global d'offre, pondéré par population.
+
+    Répond à : "Le territoire est-il globalement bien ou mal servi ?"
 
     Règles (par ordre de priorité) :
-    1. Polarisé             — Q1 ET Q5 élevés simultanément
-    2. Polarisé             — minorité défavorisée significative ET Q5 ne domine pas
-                              (dispersion_elevee : coexistence réelle des extrêmes)
-    3. Homogène mal pourvu  — Q1 fort
-    4. Homogène bien pourvu — Q5 dominant
-    5. Intermédiaire mixte  — sinon
+    1. Bien pourvu          — Q4+Q5 ≥ 60% de la population
+    2. Sous-doté            — Q1+Q2 ≥ 60% de la population
+    3. Plutôt bien pourvu   — Q4+Q5 ≥ 45%
+    4. Plutôt sous-doté     — Q1+Q2 ≥ 45%
+    5. Mixte                — sinon
+    """
+    q1q2 = h.get("part_pop_q1q2")
+    q4q5 = h.get("part_pop_q4q5")
+    if q1q2 is None or q4q5 is None:
+        q1q2 = h.get("part_pop_q1", 0) or 0
+        q4q5 = h.get("part_pop_q5", 0) or 0
+        if q1q2 is None or q4q5 is None:
+            return "Inconnu"
+    if q4q5 >= 0.60:
+        return "Bien pourvu"
+    if q1q2 >= 0.60:
+        return "Sous-doté"
+    if q4q5 >= 0.45:
+        return "Plutôt bien pourvu"
+    if q1q2 >= 0.45:
+        return "Plutôt sous-doté"
+    return "Mixte"
 
-    Note : le CV (sur z-score centré) n'est plus utilisé ici car instable quand
-    la moyenne est proche de 0. La dispersion est mesurée directement sur les
-    parts de population aux extrêmes, cohérent avec l'architecture quintile.
+
+def _heterogeneite_spatiale(h: dict) -> str:
+    """Badge de distribution spatiale de l'offre, pondéré par population.
+
+    Répond à : "La population est-elle concentrée sur un extrême, dispersée entre les deux, ou étalée ?"
+
+    Utilise les quintiles individuels Q1 et Q5 (pas Q1+Q2 / Q4+Q5) pour détecter
+    la concentration sur le quintile le plus extrême.
+
+    Règles (par ordre de priorité) :
+    1. Concentré Q5   — part_pop_q5 ≥ 50% : masse écrasante au meilleur quintile
+    2. Concentré Q1   — part_pop_q1 ≥ 50% : masse écrasante au pire quintile
+    3. Polarisé       — part_pop_q1 ≥ 20% ET part_pop_q5 ≥ 20% : coexistence réelle des extrêmes
+    4. Homogène       — part_pop_q1 < 15% ET part_pop_q5 < 35% : pas de domination des extrêmes
+    5. Intermédiaire  — sinon
     """
     q1 = h.get("part_pop_q1")
     q5 = h.get("part_pop_q5")
     if q1 is None or q5 is None:
         return "Inconnu"
-
-    # dispersion = coexistence des extrêmes pondérée par population
-    dispersion_elevee = (q1 > 0.05) and (q5 < 0.60)
-
-    # 1. Les deux extrêmes coexistent fortement
-    if q1 > 0.25 and q5 > 0.25:
+    if q5 >= 0.50:
+        return "Concentré Q5"
+    if q1 >= 0.50:
+        return "Concentré Q1"
+    if q1 >= 0.20 and q5 >= 0.20:
         return "Polarisé"
+    if q1 < 0.15 and q5 < 0.35:
+        return "Homogène"
+    return "Intermédiaire"
 
-    # 2. Homogène mal pourvu — Q1 dominant (avant la règle polarisation)
-    if q1 > 0.35:
-        return "Homogène mal pourvu"
 
-    # 3. Minorité défavorisée significative avec Q5 non négligeable → polarisation masquée
-    if dispersion_elevee and q1 > 0.10:
-        return "Polarisé"
-
-    # 4. Homogène bien pourvu
-    if q5 > 0.40 and not dispersion_elevee:
-        return "Homogène bien pourvu"
-
-    return "Intermédiaire mixte"
+def _profil_heterogeneite(h: dict) -> str:
+    """Compat : retourne '<heterogeneite_spatiale> / <niveau_offre>'."""
+    return f"{_heterogeneite_spatiale(h)} / {_niveau_offre(h)}"
 
 
 # Seuils des quintiles nationaux de taux_perenite_offre (apl_med_60 / apl_medecins)

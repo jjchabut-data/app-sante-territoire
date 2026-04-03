@@ -60,8 +60,12 @@ def setup_sidebar(df_indic, ref) -> bool:
     afficher = st.sidebar.button("Afficher", type="secondary", width="stretch")
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🗺 Carte")
+
+    from libapp.config import THEMATIQUE_OPTIONS
     with st.sidebar.expander("Configurer carte", expanded=False):
+        thematique_label = st.selectbox(
+            "Thématique", list(THEMATIQUE_OPTIONS.keys()), key="thematique_radio")
+        st.session_state["thematique_key"] = THEMATIQUE_OPTIONS[thematique_label]
         folium_tile = st.selectbox(
             "Fond de carte", list(FOLIUM_TILES.keys()),
             index=list(FOLIUM_TILES.keys()).index(FOLIUM_TILE_DEFAULT))
