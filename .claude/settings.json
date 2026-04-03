@@ -10,7 +10,8 @@
       "Read(//Applications/**)",
       "Bash(gcloud auth:*)",
       "Bash(curl -s \"https://api-territoire-sante-466874007325.europe-west1.run.app/territoires/search?q=Cantal&type=departement\")",
-      "Bash(gcloud run:*)"
+      "Bash(gcloud run:*)",
+      "Bash(gcloud builds:*)"
     ]
   }
 }

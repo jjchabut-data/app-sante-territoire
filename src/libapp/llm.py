@@ -27,17 +27,18 @@ def build_prompt(territoire, nb_communes, population, apl, force_msg,
             lignes_professions += f"- {label} : {interp} (indice {indice:.1f}/5)\n"
 
     h = heterogeneite or {}
-    from libapp.territoire import _profil_heterogeneite
-    profil = _profil_heterogeneite(h)
+    from libapp.territoire import _heterogeneite_spatiale, _niveau_offre
     if h and isinstance(h.get('cv_apl'), float):
         heterogeneite_str = (
-            f"{profil} — "
+            f"Niveau : {_niveau_offre(h)} — Distribution : {_heterogeneite_spatiale(h)} — "
             f"{h.get('part_pop_q1', 0)*100:.0f}% de la population en sous-accès (Q1), "
             f"{h.get('part_pop_q5', 0)*100:.0f}% en bon accès (Q5), "
             f"CV={h['cv_apl']:.2f}"
         )
     elif h:
-        heterogeneite_str = f"{profil} — données partielles"
+        heterogeneite_str = (
+            f"Niveau : {_niveau_offre(h)} — Distribution : {_heterogeneite_spatiale(h)} — données partielles"
+        )
     else:
         heterogeneite_str = "données indisponibles"
 
