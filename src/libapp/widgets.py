@@ -223,11 +223,12 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
             if h:
                 st.markdown("**Distribution territoriale**")
                 _DISTRIB_COLORS = {
-                    "Concentré Q5":  "#0dc735",
-                    "Concentré Q1":  "#a160cf",
-                    "Polarisé":      "#dc322f",
-                    "Homogène":      "#41b6c4",
-                    "Intermédiaire": "#C2C5C6",
+                    "Concentré Q5":         "#0dc735",
+                    "Homogène bien pourvu": "#6dbf7e",
+                    "Homogène mal pourvu":  "#c490e0",
+                    "Concentré Q1":         "#a160cf",
+                    "Polarisé":             "#dc322f",
+                    "Intermédiaire":        "#C2C5C6",
                 }
                 _NIVEAU_COLORS = {
                     "Bien pourvu":        "#0dc735",
@@ -236,23 +237,20 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
                     "Plutôt sous-doté":   "#e07b54",
                     "Sous-doté":          "#a160cf",
                 }
-                col_b1, col_b2 = st.columns(2)
-                with col_b1:
-                    st.markdown(
-                        f"<div style='font-size:0.72rem;color:gray;margin-bottom:2px'>Niveau d'offre</div>"
-                        f"<span style='background:{_NIVEAU_COLORS.get(niveau, '#C2C5C6')};color:white;"
-                        f"padding:2px 8px;border-radius:4px;font-size:0.85rem'>"
-                        f"<strong>{niveau}</strong></span>",
-                        unsafe_allow_html=True,
-                    )
-                with col_b2:
-                    st.markdown(
-                        f"<div style='font-size:0.72rem;color:gray;margin-bottom:2px'>Distribution</div>"
-                        f"<span style='background:{_DISTRIB_COLORS.get(distribution, '#C2C5C6')};color:white;"
-                        f"padding:2px 8px;border-radius:4px;font-size:0.85rem'>"
-                        f"<strong>{distribution}</strong></span>",
-                        unsafe_allow_html=True,
-                    )
+                st.markdown(
+                    f"<div style='font-size:0.72rem;color:gray;margin-bottom:2px'>Niveau d'offre</div>"
+                    f"<span style='background:{_NIVEAU_COLORS.get(niveau, '#C2C5C6')};color:white;"
+                    f"padding:2px 8px;border-radius:4px;font-size:0.85rem'>"
+                    f"<strong>{niveau}</strong></span>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f"<div style='font-size:0.72rem;color:gray;margin-top:8px;margin-bottom:2px'>Distribution</div>"
+                    f"<span style='background:{_DISTRIB_COLORS.get(distribution, '#C2C5C6')};color:white;"
+                    f"padding:2px 8px;border-radius:4px;font-size:0.85rem'>"
+                    f"<strong>{distribution}</strong></span>",
+                    unsafe_allow_html=True,
+                )
 
         st.markdown("---")
 
@@ -311,10 +309,13 @@ def afficher_header(res, communes_affichees, apl_moyens, apl_std_moyens, apl,
                 st.markdown(
                     f"<div style='margin-top:6px'>"
                     f"<div style='font-size:0.75rem;color:gray'>Taux de pérennité (médecins ≤ 60 ans)</div>"
-                    f"<div style='font-size:1.1rem;font-weight:600'>{taux_moy*100:.1f}%</div>"
-                    f"<div style='font-size:0.75rem;color:gray;margin-top:4px'>"
-                    f"ℹ️ Part de l'offre médicale portée par des médecins de 60 ans et moins. "
-                    f"Proche de 100\u202f% = territoire résilient aux départs en retraite.</div>"
+                    f"<div style='display:flex;align-items:center;gap:6px'>"
+                    f"<span style='font-size:1.1rem;font-weight:600'>{taux_moy*100:.1f}%</span>"
+                    f"<span class='tt'>ℹ️"
+                    f"<span class='tt-text'>Part de l'offre médicale portée par des médecins de 60 ans et moins. "
+                    f"Proche de 100\u202f% = territoire résilient aux départs en retraite.</span>"
+                    f"</span>"
+                    f"</div>"
                     f"{note_p_html}"
                     f"</div>",
                     unsafe_allow_html=True,
@@ -349,6 +350,19 @@ span[data-baseweb="tag"] {
 span[data-baseweb="tag"] span {
     color: #1a1a1a !important;
 }
+.tt { position: relative; display: inline-block; cursor: help; }
+.tt .tt-text {
+    visibility: hidden; opacity: 0;
+    background: #333; color: #fff;
+    font-size: 0.78rem; line-height: 1.4;
+    border-radius: 4px; padding: 5px 8px;
+    width: 220px;
+    position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%);
+    transition: opacity 0.1s;
+    z-index: 9999;
+    pointer-events: none;
+}
+.tt:hover .tt-text { visibility: visible; opacity: 1; }
 </style>
 """, unsafe_allow_html=True)
 

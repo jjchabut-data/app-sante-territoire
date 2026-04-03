@@ -9,7 +9,7 @@ from libapp.auth.permissions import get_pages_for_role, LOGIN_PAGE
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 
-st.set_page_config(page_title="Analyse Territorial Offres de soins", page_icon="🩺", layout="wide")
+st.set_page_config(page_title="Analyse Territoriale", page_icon="🩺", layout="wide")
 widgets.inject_css()
 
 # ─── INIT SESSION STATE ───────────────────────────────────────────────────────

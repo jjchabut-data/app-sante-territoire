@@ -395,6 +395,85 @@ class Territoire:
             rows.append(row)
         return pd.DataFrame(rows).sort_values("annee").reset_index(drop=True)
 
+    def _var_pct_ref(self, df_historique: pd.DataFrame, mask: pd.Series) -> dict[str, float | None]:
+        """Variation APL première→dernière année pour un sous-ensemble de communes (mask)."""
+        df = df_historique[mask].dropna(subset=["annee"])
+        if df.empty:
+            return {prof: None for prof in _PROFS_HIST}
+        annees = sorted(df["annee"].astype(int).unique())
+        if len(annees) < 2:
+            return {prof: None for prof in _PROFS_HIST}
+        a0, a1 = annees[0], annees[-1]
+        result = {}
+        for apl_col, pop_col in _PROFS_HIST.items():
+            vals = {}
+            for annee in (a0, a1):
+                g = df[df["annee"] == annee]
+                ok = g[apl_col].notna() & g[pop_col].notna()
+                vals[annee] = float(np.average(g.loc[ok, apl_col], weights=g.loc[ok, pop_col])) if ok.sum() > 0 else float("nan")
+            v0, v1 = vals[a0], vals[a1]
+            try:
+                ok = (not np.isnan(float(v0))) and (not np.isnan(float(v1))) and float(v0) != 0
+            except (TypeError, ValueError):
+                ok = False
+            result[apl_col] = round((v1 - v0) / v0, 4) if ok else None
+        return result
+
+    def tendance_comparative(self, df_historique: pd.DataFrame) -> dict:
+        """Variation APL territoire vs département, région, national.
+
+        Retourne un dict par profession :
+        {
+          "medecins": {
+            "territoire":  0.034,   # variation_pct territoire
+            "departement": 0.012,
+            "region":      0.018,
+            "national":    0.015,
+            "interpretation": "amélioration relative"  # vs dept
+          }, ...
+        }
+        """
+        t = self.tendance(df_historique)
+
+        codes_dep = self.codes_departements
+        codes_reg = self.codes_regions
+
+        mask_dep  = df_historique["code_departement"].isin(codes_dep) if codes_dep else None
+        mask_reg  = df_historique["code_region"].isin(codes_reg)      if codes_reg else None
+
+        var_dep = self._var_pct_ref(df_historique, mask_dep) if mask_dep is not None else {}
+        var_reg = self._var_pct_ref(df_historique, mask_reg) if mask_reg is not None else {}
+        var_nat = self._var_pct_ref(df_historique, df_historique.index >= 0)
+
+        _LABELS = {"apl_medecins": "medecins", "apl_infirmiers": "infirmiers",
+                   "apl_kines": "kines", "apl_sagefemmes": "sagefemmes"}
+
+        result = {}
+        for apl_col, prof in _LABELS.items():
+            v_terr = t.get(prof, {}).get("variation_pct")
+            v_dep  = var_dep.get(apl_col)
+            v_nat  = var_nat.get(apl_col)
+
+            if v_terr is not None and v_dep is not None:
+                diff = v_terr - v_dep
+                if diff > 0.03:
+                    interp = "amélioration relative"
+                elif diff < -0.03:
+                    interp = "décrochage relatif"
+                else:
+                    interp = "évolution comparable"
+            else:
+                interp = None
+
+            result[prof] = {
+                "territoire":      v_terr,
+                "departement":     v_dep,
+                "region":          var_reg.get(apl_col),
+                "national":        v_nat,
+                "interpretation":  interp,
+            }
+        return result
+
     def tendance(self, df_historique: pd.DataFrame) -> dict:
         """Calcule la tendance APL 2017→2023 agrégée pour le territoire.
 
@@ -576,12 +655,37 @@ class Territoire:
             "perenite_offre":       self.perenite_offre(),
         }
         if df_historique is not None:
-            t = self.tendance(df_historique)
+            t  = self.tendance(df_historique)
+            tc = self.tendance_comparative(df_historique)
+            _PROF_LABELS = {
+                "medecins": "APL médecins", "infirmiers": "APL infirmiers",
+                "kines": "APL kinés",       "sagefemmes": "APL sages-femmes",
+            }
             for prof in ("medecins", "infirmiers", "kines", "sagefemmes"):
-                p = t.get(prof, {})
+                p    = t.get(prof, {})
+                c    = tc.get(prof, {})
+                v_t  = p.get("variation_pct")
+                v_d  = c.get("departement")
+                v_n  = c.get("national")
+                if v_t is not None:
+                    parts = [f"{v_t*100:+.1f}% sur la période"]
+                    if v_d is not None:
+                        parts.append(f"vs {v_d*100:+.1f}% au département")
+                    if v_n is not None:
+                        parts.append(f"{v_n*100:+.1f}% au national")
+                    if c.get("interpretation"):
+                        parts.append(f"→ {c['interpretation']}")
+                    narrative = f"{_PROF_LABELS[prof]} : " + ", ".join(parts)
+                else:
+                    narrative = None
                 result[f"tendance_{prof}"] = {
-                    "variation_pct": p.get("variation_pct"),
-                    "tendance":      p.get("tendance"),
+                    "variation_pct":   v_t,
+                    "tendance":        p.get("tendance"),
+                    "departement_pct": v_d,
+                    "region_pct":      c.get("region"),
+                    "national_pct":    v_n,
+                    "interpretation":  c.get("interpretation"),
+                    "narrative":       narrative,
                 }
             pop = t.get("population", {})
             if pop:
@@ -622,20 +726,9 @@ class Territoire:
                 and not np.isnan(indice_med) and indice_med <= 2):
             result["perenite_contexte"] = "Offre fragile sur territoire déjà sous-doté"
 
-        # 3. Tendances historiques
+        # 3. Tendances historiques — tendance_{prof} déjà enrichi via to_summary()
         if df_historique is not None:
-            t = self.tendance(df_historique)
-            for prof in ("medecins", "infirmiers", "kines", "sagefemmes"):
-                p = t.get(prof, {})
-                result[f"tendance_{prof}"] = {
-                    "variation_pct": p.get("variation_pct"),
-                    "tendance":      p.get("tendance"),
-                }
-            pop = t.get("population", {})
-            if pop:
-                result["tendance_population"] = {"variation_pct": pop.get("variation_pct")}
-            result["tendance_synthese"] = t.get("synthese")
-            result["historique"]        = self.to_historique(df_historique).get("series", [])
+            result["historique"] = self.to_historique(df_historique).get("series", [])
         return result
 
     def to_prompt(self, df_historique: pd.DataFrame | None = None) -> str:
@@ -891,17 +984,17 @@ def _niveau_offre(h: dict) -> str:
 def _heterogeneite_spatiale(h: dict) -> str:
     """Badge de distribution spatiale de l'offre, pondéré par population.
 
-    Répond à : "La population est-elle concentrée sur un extrême, dispersée entre les deux, ou étalée ?"
+    Répond à : "La population est-elle concentrée sur un extrême, répartie uniformément, ou polarisée ?"
 
-    Utilise les quintiles individuels Q1 et Q5 (pas Q1+Q2 / Q4+Q5) pour détecter
-    la concentration sur le quintile le plus extrême.
+    Utilise les quintiles individuels Q1 et Q5.
 
     Règles (par ordre de priorité) :
-    1. Concentré Q5   — part_pop_q5 ≥ 50% : masse écrasante au meilleur quintile
-    2. Concentré Q1   — part_pop_q1 ≥ 50% : masse écrasante au pire quintile
-    3. Polarisé       — part_pop_q1 ≥ 20% ET part_pop_q5 ≥ 20% : coexistence réelle des extrêmes
-    4. Homogène       — part_pop_q1 < 15% ET part_pop_q5 < 35% : pas de domination des extrêmes
-    5. Intermédiaire  — sinon
+    1. Concentré Q5        — q5 ≥ 50% : masse écrasante dans le meilleur quintile
+    2. Concentré Q1        — q1 ≥ 50% : masse écrasante dans le pire quintile
+    3. Polarisé            — q1 ≥ 20% ET q5 ≥ 20% : coexistence réelle des deux extrêmes
+    4. Homogène mal pourvu — q5 < 10% : quasi-absence de bon accès, population étalée dans le bas
+    5. Homogène bien pourvu— q1 < 10% : quasi-absence de sous-accès, population étalée dans le haut
+    6. Intermédiaire       — sinon
     """
     q1 = h.get("part_pop_q1")
     q5 = h.get("part_pop_q5")
@@ -913,8 +1006,10 @@ def _heterogeneite_spatiale(h: dict) -> str:
         return "Concentré Q1"
     if q1 >= 0.20 and q5 >= 0.20:
         return "Polarisé"
-    if q1 < 0.15 and q5 < 0.35:
-        return "Homogène"
+    if q5 < 0.10:
+        return "Homogène mal pourvu"
+    if q1 < 0.10:
+        return "Homogène bien pourvu"
     return "Intermédiaire"
 
 

@@ -55,13 +55,14 @@ niveau_offre (niveau global de desserte, pondéré par population) :
 - "Sous-doté" : Q1+Q2 ≥ 60%.
 
 profil_heterogeneite (distribution spatiale de l'offre entre communes, basé sur Q1 et Q5 individuels) :
-- "Concentré Q5" : part_pop_q5 ≥ 50% — la population est massivement dans le meilleur quintile.
-- "Concentré Q1" : part_pop_q1 ≥ 50% — la population est massivement dans le pire quintile.
-- "Polarisé" : part_pop_q1 ≥ 20% ET part_pop_q5 ≥ 20% — coexistence réelle des extrêmes, inégalités internes fortes.
-- "Homogène" : part_pop_q1 < 15% ET part_pop_q5 < 35% — pas de domination des extrêmes, distribution étalée.
+- "Concentré Q5" : part_pop_q5 ≥ 50% — masse écrasante dans le meilleur quintile.
+- "Concentré Q1" : part_pop_q1 ≥ 50% — masse écrasante dans le pire quintile.
+- "Polarisé" : part_pop_q1 ≥ 20% ET part_pop_q5 ≥ 20% — coexistence réelle des deux extrêmes.
+- "Homogène mal pourvu" : part_pop_q5 < 10% — quasi-absence de bon accès, population étalée dans Q1-Q3.
+- "Homogène bien pourvu" : part_pop_q1 < 10% — quasi-absence de sous-accès, population étalée dans Q3-Q5.
 - "Intermédiaire" : aucune des configurations précédentes.
 
-Exemple : "Bien pourvu + Concentré Q5" avec part_pop_q5=62%, part_pop_q1=6% → territoire bien servi, l'offre est très concentrée sur le meilleur quintile, quelques communes en Q1 mais peu peuplées.
+Exemple : "Sous-doté + Homogène mal pourvu" → Q1+Q2+Q3 ≈ 100% de la population, territoire uniformément mal desservi sans fracture interne.
 
 Pérennité de l'offre médicale (perenite_offre) :
 - badge : "Offre résiliente" / "Offre modérément exposée" / "Offre fragile"
@@ -69,9 +70,13 @@ Pérennité de l'offre médicale (perenite_offre) :
 
 Tendances historiques (2017→2023) :
 - tendance_synthese : "amélioration" / "stable" / "dégradation" / "situation mixte"
-- tendance_{profession}.variation_pct : variation relative APL 2017→2023. < -11% = dégradation, > -1% = amélioration.
+- tendance_{profession}.variation_pct : variation relative APL territoire sur la période.
+- tendance_{profession}.departement_pct / region_pct / national_pct : même variation pour les niveaux de référence.
+- tendance_{profession}.interpretation : "amélioration relative" / "décrochage relatif" / "évolution comparable" — comparaison vs département.
+- tendance_{profession}.narrative : phrase synthétique prête à l'emploi, ex. "APL médecins : +3.4% sur la période, vs +1.2% au département, +1.5% au national → amélioration relative".
 - tendance_population.variation_pct : évolution démographique.
 Règle : si population hausse ET APL dégradation → tension réelle, mets-le en avant.
+Règle : utilise narrative directement dans l'analyse — c'est la formulation calibrée.
 
 L'analyse doit rester factuelle. Toute interprétation au-delà des indicateurs doit être signalée comme hypothèse.
 """
@@ -404,7 +409,7 @@ if "res" in st.session_state and "communes_affichees" in st.session_state:
     t_code  = res.get("code")
 
     st.info(f"Territoire chargé : **{label}**")
-    if st.button(f"✨ Analyser {label}", key="agent_analyse_ctx"):
+    if st.button("✨ Analyser le territoire", key="agent_analyse_ctx"):
         prompt_ctx = f"Fais une analyse complète de l'accès aux soins pour {label}."
         if "agent_messages" not in st.session_state:
             st.session_state["agent_messages"] = []
