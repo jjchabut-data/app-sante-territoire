@@ -3,9 +3,9 @@ from libapp.config import USAGE_TO_MODE
 
 # --- Définition centralisée de toutes les pages ---
 ALL_PAGES = {
-    "diagnostic":    st.Page("pages/1_Diagnostic.py",   title="Territoire",    icon="🗺️", default=True),
-    "clustering":    st.Page("pages/3_Vue_Nationale.py", title="Vue nationale", icon="🗺️"),
-    "agent_ia":      st.Page("pages/4_Agent IA.py",     title="Agent IA",      icon="🤖"),
+    "exploration":    st.Page("pages/Exploration.py",   title="Territoire",    icon="🗺️", default=True),
+    "carte_nationale":    st.Page("pages/Vue_Nationale.py", title="Vue nationale", icon="🗺️"),
+    "agent_ia":      st.Page("pages/Agent IA.py",     title="Agent IA",      icon="🤖"),
     "documentation": st.Page("pages/Methodologie.py",   title="Méthodologie",  icon="📚"),
     "lexique":       st.Page("pages/Lexique.py",         title="Lexique",       icon="📜"),
 }
@@ -14,15 +14,15 @@ ALL_PAGES = {
 # Reproduit la structure de st.navigation(dict) avec sections
 ROLES = {
     "admin": {
-        "Analyse": ["diagnostic", "clustering", "agent_ia"],
+        "Analyse": ["exploration", "carte_nationale", "agent_ia"],
         "Références": ["documentation", "lexique"],
     },
     "guest": {
-        "Analyse": ["diagnostic", "clustering", "agent_ia"],
+        "Analyse": ["exploration", "carte_nationale", "agent_ia"],
         "Références": ["documentation", "lexique"],
     },
     "visitor": {
-        "Analyse": ["diagnostic", "agent_ia"],
+        "Analyse": ["exploration", "carte_nationale", "agent_ia"],
         "Références": ["documentation", "lexique"],
     },
 }
