@@ -6,6 +6,7 @@ Deux modes :
 - Chat libre sur n'importe quel territoire
 """
 
+import os
 import json
 import time
 import requests
@@ -22,6 +23,19 @@ widgets.inject_css()
 _API_BASE = st.secrets.get("api", {}).get("base_url", "http://localhost:8000")
 _API_KEY  = st.secrets.get("api", {}).get("api_key", "")
 _HEADERS  = {"X-API-Key": _API_KEY} if _API_KEY else {}
+
+# ---------------------------------------------------------------------------
+# Langfuse init — doit être fait AVANT l'import de observe/get_client
+# ---------------------------------------------------------------------------
+
+# Les variables d'env doivent être définies AVANT l'import de langfuse,
+# car la bibliothèque les lit à l'initialisation du module.
+_lf_cfg = st.secrets.get("langfuse", {})
+os.environ["LANGFUSE_PUBLIC_KEY"] = _lf_cfg.get("public_key", "")
+os.environ["LANGFUSE_SECRET_KEY"] = _lf_cfg.get("secret_key", "")
+os.environ["LANGFUSE_HOST"]       = _lf_cfg.get("base_url", "https://cloud.langfuse.com")
+
+from langfuse import observe, get_client  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # System prompt & tools
@@ -115,6 +129,8 @@ _TOOLS = [
     },
 ]
 
+# Tarifs en $/million de tokens (input, output) pour estimer le coût à l'affichage.
+# Source : pages de pricing officielles des fournisseurs (avril 2026).
 _GEMINI_COSTS = {
     "gemini-2.0-flash":             (0.075, 0.30),
     "gemini-2.5-pro-preview-05-06": (1.25, 10.00),
@@ -133,6 +149,11 @@ _OPENAI_COSTS = {
 
 
 def _call_tool(name: str, tool_input: dict) -> str:
+    """Exécute un outil demandé par le LLM et retourne le résultat en JSON string.
+
+    Toutes les erreurs sont retournées sous forme de JSON {"error": "..."} plutôt
+    que d'être levées, pour que le LLM puisse les lire et adapter sa réponse.
+    """
     try:
         if name == "search_territoire":
             params = {"q": tool_input["q"], "type": tool_input["type"], "limit": 5}
@@ -165,11 +186,24 @@ def _call_tool(name: str, tool_input: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
+@observe(name="agent_anthropic", as_type="generation")
 def _run_agent_anthropic(messages: list, model: str) -> tuple[str, dict]:
+    """Boucle ReAct pour Anthropic : le modèle peut appeler des outils en plusieurs tours.
+
+    Pattern :
+      1. Appel au modèle avec l'historique complet.
+      2. Si stop_reason == "tool_use" → exécuter les outils, injecter les résultats,
+         recommencer (jusqu'à 10 itérations max pour éviter les boucles infinies).
+      3. Si stop_reason == "end_turn" → le modèle a fini, on retourne le texte.
+
+    Le décorateur @observe trace l'appel dans Langfuse.
+    update_current_generation() enrichit la trace avec les tokens consommés.
+    """
     import anthropic
     client = anthropic.Anthropic(api_key=st.secrets["llm"]["api_key"])
     usage_total = {"input_tokens": 0, "output_tokens": 0}
     loop_messages = list(messages)
+    reply = "Limite d'itérations atteinte."
 
     for _ in range(10):
         response = client.messages.create(
@@ -181,9 +215,14 @@ def _run_agent_anthropic(messages: list, model: str) -> tuple[str, dict]:
         text_parts = [b.text for b in response.content if b.type == "text"]
 
         if response.stop_reason == "end_turn":
-            return "\n".join(text_parts), usage_total
+            # Le modèle a terminé sa réponse, on sort de la boucle.
+            reply = "\n".join(text_parts)
+            break
 
         if response.stop_reason == "tool_use":
+            # Le modèle demande l'exécution d'un ou plusieurs outils.
+            # On ajoute la réponse "assistant" dans l'historique, puis les résultats
+            # sous le rôle "user" (convention Anthropic pour les tool_result).
             loop_messages.append({"role": "assistant", "content": response.content})
             tool_results = []
             for block in response.content:
@@ -197,16 +236,37 @@ def _run_agent_anthropic(messages: list, model: str) -> tuple[str, dict]:
                     })
             loop_messages.append({"role": "user", "content": tool_results})
         else:
-            return "\n".join(text_parts), usage_total
+            # Stop reason inattendu (ex: max_tokens) → on retourne ce qu'on a.
+            reply = "\n".join(text_parts)
+            break
 
-    return "Limite d'itérations atteinte.", usage_total
+    # Mise à jour de la trace Langfuse avec la consommation totale de tokens.
+    get_client().update_current_generation(
+        model=model,
+        usage_details={
+            "input":  usage_total["input_tokens"],
+            "output": usage_total["output_tokens"],
+        },
+    )
+    return reply, usage_total
 
 
 def _run_agent_gemini(messages: list, model_name: str) -> tuple[str, dict]:
+    """Boucle ReAct pour Gemini (Google AI).
+
+    L'API Gemini gère l'historique via un objet `chat` persistant.
+    On injecte l'historique existant (tout sauf le dernier message) au démarrage,
+    puis on envoie le dernier message pour démarrer l'itération courante.
+
+    À chaque tour :
+    - Si la réponse ne contient pas de function_call → c'est la réponse finale.
+    - Sinon → exécuter les outils et renvoyer les résultats comme prochain message.
+    """
     import google.generativeai as genai
     from google.generativeai.types import FunctionDeclaration, Tool
 
     genai.configure(api_key=st.secrets["gemini"]["api_key"])
+    # Conversion des outils au format FunctionDeclaration attendu par Gemini.
     gemini_tool = Tool(function_declarations=[
         FunctionDeclaration(name=t["name"], description=t["description"],
                             parameters=t["input_schema"])
@@ -216,6 +276,9 @@ def _run_agent_gemini(messages: list, model_name: str) -> tuple[str, dict]:
         model_name=model_name, system_instruction=_SYSTEM_PROMPT, tools=[gemini_tool],
     )
     usage_total = {"input_tokens": 0, "output_tokens": 0}
+
+    # Reconstruction de l'historique pour l'objet chat Gemini.
+    # Note : Gemini utilise "model" au lieu de "assistant" pour le rôle IA.
     history = []
     for m in messages[:-1]:
         history.append({"role": "model" if m["role"] == "assistant" else "user",
@@ -228,10 +291,15 @@ def _run_agent_gemini(messages: list, model_name: str) -> tuple[str, dict]:
         if hasattr(response, "usage_metadata"):
             usage_total["input_tokens"]  += response.usage_metadata.prompt_token_count or 0
             usage_total["output_tokens"] += response.usage_metadata.candidates_token_count or 0
+
+        # Extraction des appels de fonctions dans les parts de la réponse.
         fn_calls = [p.function_call for p in response.parts
                     if hasattr(p, "function_call") and p.function_call.name]
         if not fn_calls:
+            # Aucun outil demandé → réponse textuelle finale.
             return response.text, usage_total
+
+        # Construction des FunctionResponse à renvoyer au modèle.
         fn_response_parts = []
         for fc in fn_calls:
             result = _call_tool(fc.name, dict(fc.args))
@@ -249,9 +317,15 @@ def _run_agent_gemini(messages: list, model_name: str) -> tuple[str, dict]:
 
 
 def _run_agent_openai(messages: list, model: str) -> tuple[str, dict]:
+    """Boucle ReAct pour OpenAI (Chat Completions API).
+
+    Différence vs Anthropic : le system prompt est injecté comme premier message
+    avec le rôle "system", et les résultats d'outils utilisent le rôle "tool".
+    """
     from openai import OpenAI
     client = OpenAI(api_key=st.secrets["openai"]["api_key"])
     usage_total = {"input_tokens": 0, "output_tokens": 0}
+    # Conversion des outils au format "function" attendu par l'API OpenAI.
     openai_tools = [{"type": "function", "function": {
         "name": t["name"], "description": t["description"], "parameters": t["input_schema"],
     }} for t in _TOOLS]
@@ -265,7 +339,10 @@ def _run_agent_openai(messages: list, model: str) -> tuple[str, dict]:
         usage_total["output_tokens"] += response.usage.completion_tokens
         msg = response.choices[0].message
         if not msg.tool_calls:
+            # Aucun appel d'outil → réponse finale.
             return msg.content or "", usage_total
+        # On ajoute la réponse "assistant" (avec ses tool_calls) dans l'historique,
+        # puis les résultats d'outils au format "tool".
         loop_messages.append(msg)
         for tc in msg.tool_calls:
             fn_args = json.loads(tc.function.arguments)
@@ -279,6 +356,12 @@ def _run_agent_openai(messages: list, model: str) -> tuple[str, dict]:
 
 
 def _run_agent_ollama(messages: list, model: str) -> tuple[str, dict]:
+    """Boucle ReAct pour Ollama (modèles locaux).
+
+    Ollama supporte le tool-use pour les modèles qui l'implémentent (ex: llama3.1).
+    Pas de remontée de tokens → le dict d'usage retourné est vide.
+    L'erreur est catchée car Ollama peut ne pas être lancé.
+    """
     import ollama
     ollama_tools = [{"type": "function", "function": {
         "name": t["name"], "description": t["description"], "parameters": t["input_schema"],
@@ -293,6 +376,8 @@ def _run_agent_ollama(messages: list, model: str) -> tuple[str, dict]:
         msg = response.message
         if not msg.tool_calls:
             return msg.content or "", {}
+        # Ollama exige que les tool_calls soient inclus dans le message "assistant"
+        # pour maintenir la cohérence de l'historique.
         loop_messages.append({"role": "assistant", "content": msg.content or "",
                                "tool_calls": msg.tool_calls})
         for tc in msg.tool_calls:
@@ -318,6 +403,23 @@ def _check_api() -> bool:
         return False
 
 
+_ANTHROPIC_FALLBACK_MODELS = [
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-opus-4-6",
+]
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _get_anthropic_models() -> list[str]:
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=st.secrets["llm"]["api_key"])
+        models = [m.id for m in client.models.list().data]
+        return sorted(models, reverse=True) if models else _ANTHROPIC_FALLBACK_MODELS
+    except Exception:
+        return _ANTHROPIC_FALLBACK_MODELS
+
+
 def _get_ollama_models() -> list[str]:
     try:
         import ollama
@@ -328,7 +430,9 @@ def _get_ollama_models() -> list[str]:
 
 def _run_agent(messages: list, moteur: str, model: str) -> tuple[str, dict]:
     if moteur == "Anthropic (Cloud)":
-        return _run_agent_anthropic(messages, model)
+        result = _run_agent_anthropic(messages, model)
+        get_client().flush()
+        return result
     elif moteur == "Gemini (Cloud)":
         return _run_agent_gemini(messages, model)
     elif moteur == "OpenAI (Cloud)":
@@ -338,6 +442,11 @@ def _run_agent(messages: list, moteur: str, model: str) -> tuple[str, dict]:
 
 
 def _cost_stats(moteur: str, model: str, usage: dict, duree: float) -> str:
+    """Formate une ligne de stats affichée sous chaque réponse de l'agent.
+
+    Retourne uniquement le temps si les tokens ne sont pas disponibles (ex: Ollama).
+    Pour Anthropic, utilise le tarif du modèle claude-sonnet (fallback 3.0/15.0).
+    """
     tokens_in  = usage.get("input_tokens")
     tokens_out = usage.get("output_tokens")
     if not tokens_in or not tokens_out:
@@ -347,6 +456,7 @@ def _cost_stats(moteur: str, model: str, usage: dict, duree: float) -> str:
     elif moteur == "OpenAI (Cloud)":
         price_in, price_out = _OPENAI_COSTS.get(model, (2.5, 10.0))
     else:
+        # Fallback Anthropic : tarif approximatif claude-sonnet
         price_in, price_out = 3.0, 15.0
     cout = (tokens_in * price_in + tokens_out * price_out) / 1_000_000
     return f"⏱️ {duree:.1f}s — {tokens_in} in / {tokens_out} out — ~${cout:.4f}"
@@ -371,11 +481,7 @@ with st.sidebar:
         moteur = st.radio("Moteur :", engines, key="agent_moteur")
 
         if moteur == "Anthropic (Cloud)":
-            model = st.selectbox("Modèle", [
-                "claude-sonnet-4-20250514",
-                "claude-haiku-4-5-20251001",
-                "claude-opus-4-20250514",
-            ], key="agent_model")
+            model = st.selectbox("Modèle", _get_anthropic_models(), key="agent_model")
         elif moteur == "Gemini (Cloud)":
             model = st.selectbox("Modèle", list(_GEMINI_COSTS), key="agent_model")
         elif moteur == "OpenAI (Cloud)":
@@ -385,7 +491,7 @@ with st.sidebar:
         st.info(f"Modèle : **{model}**")
     else:
         moteur = "Anthropic (Cloud)"
-        model  = "claude-sonnet-4-20250514"
+        model  = _get_anthropic_models()[0]
 
     st.divider()
     if st.button("Effacer la conversation", key="agent_clear"):
@@ -402,6 +508,8 @@ if not api_ok:
     st.stop()
 
 # ── Bouton contextuel si territoire chargé depuis Diagnostic ─────────────────
+# Si l'utilisateur vient de la page Diagnostic avec un territoire sélectionné,
+# on propose un bouton "Analyser" qui pré-remplit un prompt de façon transparente.
 if "res" in st.session_state and "communes_affichees" in st.session_state:
     res     = st.session_state["res"]
     label   = res.get("territoire_label", "")
@@ -413,6 +521,9 @@ if "res" in st.session_state and "communes_affichees" in st.session_state:
         prompt_ctx = f"Fais une analyse complète de l'accès aux soins pour {label}."
         if "agent_messages" not in st.session_state:
             st.session_state["agent_messages"] = []
+        # On ajoute le message à l'historique ET on stocke le prompt dans _agent_pending
+        # pour qu'il soit traité après le st.rerun() (pattern Streamlit pour déclencher
+        # un traitement sur le prochain rendu).
         st.session_state["agent_messages"].append({"role": "user", "content": prompt_ctx})
         st.session_state["_agent_pending"] = prompt_ctx
         st.rerun()
@@ -443,18 +554,23 @@ if prompt:
         st.markdown(prompt)
 
 # ── Traitement du message en attente (chat ou contextuel) ─────────────────────
+# On fusionne les deux sources possibles de déclenchement :
+# - _agent_pending : prompt injecté par le bouton contextuel (après un rerun)
+# - prompt : saisie directe dans le chat_input
+# pop() supprime la clé pour éviter une double exécution au prochain rendu.
 pending = st.session_state.pop("_agent_pending", None) or (
     prompt if prompt else None
 )
 
 if pending:
+    # Reconstruction de l'historique sans les stats (le LLM n'en a pas besoin).
     messages = [{"role": m["role"], "content": m["content"]}
                 for m in st.session_state["agent_messages"]]
 
     with st.chat_message("assistant"):
         with st.spinner("Réflexion en cours…"):
             t0 = time.time()
-            st.session_state["agent_tool_calls"] = []
+            st.session_state["agent_tool_calls"] = []  # reset avant chaque appel
             reply, usage = _run_agent(messages, moteur, model)
             duree = time.time() - t0
         st.markdown(reply)
@@ -463,4 +579,5 @@ if pending:
     st.session_state["agent_messages"].append(
         {"role": "assistant", "content": reply, "stats": stats}
     )
+    # Rerun pour afficher les appels d'outils mis à jour dans l'expander.
     st.rerun()

@@ -9,3 +9,4 @@ __pycache__/
 config.yaml
 .python-version
 .streamlit/secrets.toml
+.claude/worktrees/
