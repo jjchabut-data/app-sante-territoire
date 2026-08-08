@@ -1,7 +1,22 @@
 import streamlit as st
 import numpy as np
 import anthropic
+from langfuse.decorators import observe, langfuse_context
 from libapp.config import SYSTEM_PROMPT, ANALYSE_TEMPLATE, APL_LABELS, APL_STD_COLS
+
+
+# ---------------------------------------------------------------------------
+# Langfuse init
+# ---------------------------------------------------------------------------
+
+def _init_langfuse():
+    """Configure le SDK Langfuse (decorators) depuis st.secrets."""
+    cfg = st.secrets.get("langfuse", {})
+    langfuse_context.configure(
+        public_key=cfg.get("public_key"),
+        secret_key=cfg.get("secret_key"),
+        host=cfg.get("base_url", "https://cloud.langfuse.com"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -57,9 +72,20 @@ def build_prompt(territoire, nb_communes, population, apl, force_msg,
 # Providers
 # ---------------------------------------------------------------------------
 
-def _chat_anthropic(prompt: str):
+@observe(name="chat_anthropic")
+def _chat_anthropic(prompt: str, territoire: str = None):
     cfg = st.secrets["llm"]
     client = anthropic.Anthropic(api_key=cfg["api_key"])
+
+    # Métadonnées ops envoyées à Langfuse (pas de données sensibles)
+    langfuse_context.update_current_observation(
+        metadata={
+            "model": cfg.get("model", "claude-sonnet-4-20250514"),
+            "territoire": territoire,
+            "moteur": "Anthropic (Cloud)",
+        }
+    )
+
     response = client.messages.create(
         model=cfg.get("model", "claude-sonnet-4-20250514"),
         max_tokens=1024,
@@ -70,6 +96,15 @@ def _chat_anthropic(prompt: str):
         "input_tokens":  response.usage.input_tokens,
         "output_tokens": response.usage.output_tokens,
     }
+
+    # Usage tokens envoyé à Langfuse pour monitoring coûts
+    langfuse_context.update_current_observation(
+        usage={
+            "input": usage["input_tokens"],
+            "output": usage["output_tokens"],
+        }
+    )
+
     return response.content[0].text, usage
 
 
@@ -104,7 +139,8 @@ def generate_analyse(territoire, nb_communes, population, apl, force_msg,
                           heterogeneite=heterogeneite)
 
     if moteur == "Anthropic (Cloud)":
-        return _chat_anthropic(prompt)
+        _init_langfuse()
+        return _chat_anthropic(prompt, territoire=territoire)
     elif moteur == "Ollama (Local)":
         if not selected_model:
             raise ValueError("Aucun modèle Ollama sélectionné.")
