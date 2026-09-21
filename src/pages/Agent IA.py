@@ -1,9 +1,8 @@
 """
 4_Agent IA.py — Agent conversationnel ReAct / tool-use.
 
-Deux modes :
-- Bouton contextuel "Analyser ce territoire" si un territoire est chargé depuis Diagnostic
-- Chat libre sur n'importe quel territoire
+Chat libre sur n'importe quel territoire. Le territoire chargé dans la page
+Territoire (avec son rayon) est transmis à l'agent comme contexte par défaut.
 """
 
 import os
@@ -51,6 +50,13 @@ Pour répondre aux questions sur des territoires, utilise TOUJOURS les outils di
 - Utilise search_territoire pour trouver le code INSEE d'un territoire à partir de son nom.
 - Utilise get_territoire_summary pour récupérer les indicateurs d'un territoire.
 
+Rayon (communes uniquement) : get_territoire_summary accepte un paramètre `rayon` en km, qui étend
+l'analyse aux communes situées dans ce rayon autour de la commune. Par défaut rayon = 0 (commune seule).
+Ne renseigne `rayon` que si l'utilisateur le demande explicitement pour cette commune (ex. « Aurillac
+et 15 km autour »). Le rayon est propre à chaque commune : dans une comparaison, applique-le uniquement
+aux communes concernées. Mentionne toujours le rayon utilisé dans ta réponse quand il est > 0.
+Le rayon n'a pas de sens pour un EPCI, un département ou une région : ne le renseigne pas.
+
 Interprétation des champs retournés par get_territoire_summary :
 
 Accès aux soins :
@@ -95,6 +101,30 @@ Règle : utilise narrative directement dans l'analyse — c'est la formulation c
 L'analyse doit rester factuelle. Toute interprétation au-delà des indicateurs doit être signalée comme hypothèse.
 """
 
+def _territoire_charge() -> dict | None:
+    """Territoire sélectionné dans la page Territoire (avec son rayon), ou None."""
+    terr = st.session_state.get("territoire")
+    res  = st.session_state.get("res")
+    if terr is None or res is None:
+        return None
+    return {"label": res.get("territoire_label", ""), "type": terr.type,
+            "code": terr.code, "rayon": terr.rayon}
+
+
+def _system_prompt() -> str:
+    """System prompt + territoire chargé, recalculé à chaque appel (la sélection peut changer)."""
+    ctx = _territoire_charge()
+    if ctx is None:
+        return _SYSTEM_PROMPT
+    return _SYSTEM_PROMPT + (
+        "\nTerritoire actuellement chargé dans la page Territoire de l'application : "
+        f"{ctx['label']} — type={ctx['type']}, code={ctx['code']}, rayon={ctx['rayon']} km.\n"
+        "Quand l'utilisateur parle de « ce territoire », « le territoire chargé », « la sélection » "
+        "ou ne nomme aucun territoire, il s'agit de celui-ci : appelle directement "
+        "get_territoire_summary avec ce type, ce code et ce rayon, sans search_territoire.\n"
+    )
+
+
 _TOOLS = [
     {
         "name": "search_territoire",
@@ -123,6 +153,10 @@ _TOOLS = [
             "properties": {
                 "type": {"type": "string", "description": "Type de territoire"},
                 "code": {"type": "string", "description": "Code INSEE du territoire"},
+                "rayon": {"type": "integer", "minimum": 0, "maximum": 50,
+                          "description": "Rayon en km autour de la commune (commune uniquement). "
+                                         "0 = commune seule (défaut). "
+                                         "À renseigner uniquement si demandé explicitement."},
             },
             "required": ["type", "code"],
         },
@@ -166,8 +200,11 @@ def _call_tool(name: str, tool_input: dict) -> str:
             return json.dumps(results)
 
         elif name == "get_territoire_summary":
+            # Gemini renvoie les entiers en float ; on borne pour rester dans la plage du slider.
+            rayon = max(0, min(50, int(tool_input.get("rayon") or 0)))
             r = requests.get(
                 f"{_API_BASE}/territoires/{tool_input['type']}/{tool_input['code']}/summary",
+                params={"rayon": rayon} if rayon else None,
                 headers=_HEADERS, timeout=15,
             )
             r.raise_for_status()
@@ -175,6 +212,8 @@ def _call_tool(name: str, tool_input: dict) -> str:
 
         return json.dumps({"error": f"Outil inconnu : {name}"})
 
+    except (TypeError, ValueError) as exc:
+        return json.dumps({"error": f"Paramètre invalide : {exc}"})
     except requests.ConnectionError:
         return json.dumps({"error": "API non disponible."})
     except requests.HTTPError as exc:
@@ -208,7 +247,7 @@ def _run_agent_anthropic(messages: list, model: str) -> tuple[str, dict]:
     for _ in range(10):
         response = client.messages.create(
             model=model, max_tokens=2048,
-            system=_SYSTEM_PROMPT, tools=_TOOLS, messages=loop_messages,
+            system=_system_prompt(), tools=_TOOLS, messages=loop_messages,
         )
         usage_total["input_tokens"]  += response.usage.input_tokens
         usage_total["output_tokens"] += response.usage.output_tokens
@@ -273,7 +312,7 @@ def _run_agent_gemini(messages: list, model_name: str) -> tuple[str, dict]:
         for t in _TOOLS
     ])
     gemini_model = genai.GenerativeModel(
-        model_name=model_name, system_instruction=_SYSTEM_PROMPT, tools=[gemini_tool],
+        model_name=model_name, system_instruction=_system_prompt(), tools=[gemini_tool],
     )
     usage_total = {"input_tokens": 0, "output_tokens": 0}
 
@@ -329,7 +368,7 @@ def _run_agent_openai(messages: list, model: str) -> tuple[str, dict]:
     openai_tools = [{"type": "function", "function": {
         "name": t["name"], "description": t["description"], "parameters": t["input_schema"],
     }} for t in _TOOLS]
-    loop_messages = [{"role": "system", "content": _SYSTEM_PROMPT}] + list(messages)
+    loop_messages = [{"role": "system", "content": _system_prompt()}] + list(messages)
 
     for _ in range(10):
         response = client.chat.completions.create(
@@ -366,7 +405,7 @@ def _run_agent_ollama(messages: list, model: str) -> tuple[str, dict]:
     ollama_tools = [{"type": "function", "function": {
         "name": t["name"], "description": t["description"], "parameters": t["input_schema"],
     }} for t in _TOOLS]
-    loop_messages = [{"role": "system", "content": _SYSTEM_PROMPT}] + list(messages)
+    loop_messages = [{"role": "system", "content": _system_prompt()}] + list(messages)
 
     for _ in range(10):
         try:
@@ -507,26 +546,24 @@ if not api_ok:
     st.error("API indisponible — impossible de lancer l'agent.")
     st.stop()
 
-# ── Bouton contextuel si territoire chargé depuis Diagnostic ─────────────────
-# Si l'utilisateur vient de la page Diagnostic avec un territoire sélectionné,
-# on propose un bouton "Analyser" qui pré-remplit un prompt de façon transparente.
-if "res" in st.session_state and "communes_affichees" in st.session_state:
-    res     = st.session_state["res"]
-    label   = res.get("territoire_label", "")
-    t_type  = res.get("type")
-    t_code  = res.get("code")
-
-    st.info(f"Territoire chargé : **{label}**")
+# ── Territoire chargé (page Territoire) ──────────────────────────────────────
+# Transmis à l'agent via le system prompt ; un rayon peut aussi être demandé
+# explicitement dans la conversation, commune par commune (0 par défaut).
+ctx = _territoire_charge()
+if ctx:
+    rayon_str = f" — rayon {ctx['rayon']} km" if ctx["rayon"] else ""
+    st.info(f"Territoire chargé : **{ctx['label']}**{rayon_str}")
     if st.button("✨ Analyser le territoire", key="agent_analyse_ctx"):
-        prompt_ctx = f"Fais une analyse complète de l'accès aux soins pour {label}."
-        if "agent_messages" not in st.session_state:
-            st.session_state["agent_messages"] = []
-        # On ajoute le message à l'historique ET on stocke le prompt dans _agent_pending
-        # pour qu'il soit traité après le st.rerun() (pattern Streamlit pour déclencher
-        # un traitement sur le prochain rendu).
-        st.session_state["agent_messages"].append({"role": "user", "content": prompt_ctx})
+        prompt_ctx = f"Fais une analyse complète de l'accès aux soins pour {ctx['label']}"
+        prompt_ctx += f" dans un rayon de {ctx['rayon']} km." if ctx["rayon"] else "."
+        st.session_state.setdefault("agent_messages", []).append(
+            {"role": "user", "content": prompt_ctx})
+        # Traité au rerun suivant (pattern Streamlit pour déclencher un traitement).
         st.session_state["_agent_pending"] = prompt_ctx
         st.rerun()
+else:
+    st.caption("Aucun territoire chargé — sélectionnez-en un dans la page Territoire "
+               "ou nommez-le dans la conversation.")
 
 st.divider()
 
@@ -553,14 +590,9 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-# ── Traitement du message en attente (chat ou contextuel) ─────────────────────
-# On fusionne les deux sources possibles de déclenchement :
-# - _agent_pending : prompt injecté par le bouton contextuel (après un rerun)
-# - prompt : saisie directe dans le chat_input
+# ── Traitement du message (chat ou bouton) ────────────────────────────────────
 # pop() supprime la clé pour éviter une double exécution au prochain rendu.
-pending = st.session_state.pop("_agent_pending", None) or (
-    prompt if prompt else None
-)
+pending = st.session_state.pop("_agent_pending", None) or prompt
 
 if pending:
     # Reconstruction de l'historique sans les stats (le LLM n'en a pas besoin).
