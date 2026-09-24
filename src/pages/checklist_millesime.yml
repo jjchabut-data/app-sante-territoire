@@ -1,0 +1,14 @@
+# Avancement de la préparation du prochain millésime APL (voir page
+# "Sources & millésimes"). Les items ci-dessous n'ont pas d'artefact
+# vérifiable automatiquement dans le pipeline (contrairement aux données
+# intégrées / indicateurs recalculés, vérifiés en direct sur BigQuery par
+# export_mart_meta_sources.py) — à passer à true seulement quand le travail
+# est réellement fait, jamais par anticipation. Voir docs/ChangementMillesime.md §9.
+#
+# Une fois la version promue en prod (annee_apl basculée), remettre ces 4
+# items à false pour repartir sur le millésime suivant.
+
+donnees_socio_eco_integrees: false
+controles_qualite_faits: false
+clustering_recalcule: false
+resultats_controles: false

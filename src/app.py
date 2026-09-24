@@ -5,7 +5,7 @@ from libapp import widgets
 from libapp import config
 from libapp.utils import APL_COLS
 from libapp.auth import is_authenticated, current_user, logout
-from libapp.auth.permissions import get_pages_for_role, LOGIN_PAGE
+from libapp.auth.permissions import get_pages_for_role, LOGIN_PAGE, ALL_PAGES
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,16 @@ else:
         if st.button("Se déconnecter", use_container_width=True):
             logout()
             st.rerun()
+
+        domaine = config.DOMAINES.get(user.get("domaine"), user.get("domaine"))
+        if domaine:
+            st.caption(f"Domaine : **{domaine}**")
+
+        try:
+            millesime_apl = pd.read_parquet(config.DATA_DIR / "mart_meta_sources.parquet")["millesime_apl"].iloc[0]
+            st.page_link(ALL_PAGES["sources"], label=f"Données : APL {millesime_apl}", icon="📊")
+        except FileNotFoundError:
+            pass
 
 
     pg = st.navigation(pages, position="top")

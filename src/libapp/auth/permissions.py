@@ -8,6 +8,7 @@ ALL_PAGES = {
     "agent_ia":      st.Page("pages/Agent IA.py",     title="Agent IA",      icon="🤖"),
     "documentation": st.Page("pages/Methodologie.py",   title="Méthodologie",  icon="📚"),
     "lexique":       st.Page("pages/Lexique.py",         title="Lexique",       icon="📜"),
+    "sources":       st.Page("pages/Sources_Donnees.py", title="Sources & millésimes", icon="📊"),
 }
 
 # --- Rôles : sections → clés de ALL_PAGES ---
@@ -15,15 +16,15 @@ ALL_PAGES = {
 ROLES = {
     "admin": {
         "Analyse": ["exploration", "carte_nationale", "agent_ia"],
-        "Références": ["documentation", "lexique"],
+        "Références": ["documentation", "lexique", "sources"],
     },
     "guest": {
         "Analyse": ["exploration", "carte_nationale", "agent_ia"],
-        "Références": ["documentation", "lexique"],
+        "Références": ["documentation", "lexique", "sources"],
     },
     "visitor": {
         "Analyse": ["exploration", "carte_nationale", "agent_ia"],
-        "Références": ["documentation", "lexique"],
+        "Références": ["documentation", "lexique", "sources"],
     },
 }
 

@@ -1,42 +1,54 @@
 #!/usr/bin/env python3
 """
-Télécharge les fichiers APL DREES pour toutes les professions.
-Usage : python fetch_apl_all_profs.py
-Sortie : ../../data/raw/source/
+Télécharge les fichiers APL DREES pour toutes les professions, pour un
+millésime donné.
+
+Chaque URL renvoie un fichier unique par profession, mis à jour en place par
+la DREES et cumulant un onglet par millésime (ex. "APL 2023", "APL 2024") :
+le suffixe `_<annee>` dans le nom de fichier local sert à forcer un nouveau
+téléchargement à chaque millésime plutôt que de réutiliser silencieusement
+un fichier déjà présent mais périmé. Voir load_apl_all_profs.py pour le
+chargement.
+
+Usage : python fetch_apl_all_profs.py --annee 2024
+Sortie : ../../data/raw/source/apl/<annee>/
 """
 
-import os
+import argparse
 import sys
 from pathlib import Path
 import requests
 
-OUTPUT_DIR = Path(__file__).parent / "../../data/raw/source"
+SOURCE_DIR = Path(__file__).parent / "../../data/raw/source" / "apl"
 
+# (slug, url) — slug aligné sur PROFESSIONS dans load_apl_all_profs.py
+# API v2 (l'ancienne API v1 /api/datasets/1.0/.../ renvoie 404 depuis le
+# changement de plateforme DREES).
 FICHIERS = {
-    "apl_medecins_generalistes.xlsx": (
-        "https://data.drees.solidarites-sante.gouv.fr/api/datasets/1.0/"
+    "medecins_generalistes": (
+        "https://data.drees.solidarites-sante.gouv.fr/api/v2/catalog/datasets/"
         "530_l-accessibilite-potentielle-localisee-apl/attachments/"
-        "indicateur_d_accessibilite_potentielle_localisee_apl_aux_medecins_generalistes_xlsx/"
+        "indicateur_d_apl_aux_medecins_generalistes_xlsx"
     ),
-    "apl_sages_femmes.xlsx": (
-        "https://data.drees.solidarites-sante.gouv.fr/api/datasets/1.0/"
+    "sages_femmes": (
+        "https://data.drees.solidarites-sante.gouv.fr/api/v2/catalog/datasets/"
         "530_l-accessibilite-potentielle-localisee-apl/attachments/"
-        "indicateur_d_accessibilite_potentielle_localisee_apl_aux_sages_femmes_xlsx/"
+        "indicateur_d_apl_aux_sages_femmes_xlsx"
     ),
-    "apl_kinesitherapeutes.xlsx": (
-        "https://data.drees.solidarites-sante.gouv.fr/api/datasets/1.0/"
+    "kinesitherapeutes": (
+        "https://data.drees.solidarites-sante.gouv.fr/api/v2/catalog/datasets/"
         "530_l-accessibilite-potentielle-localisee-apl/attachments/"
-        "indicateur_d_accessibilite_potentielle_localisee_apl_aux_kinesitherapeutes_xlsx/"
+        "indicateur_d_apl_aux_kinesitherapeutes_xlsx"
     ),
-    "apl_infirmieres.xlsx": (
-        "https://data.drees.solidarites-sante.gouv.fr/api/datasets/1.0/"
+    "infirmieres": (
+        "https://data.drees.solidarites-sante.gouv.fr/api/v2/catalog/datasets/"
         "530_l-accessibilite-potentielle-localisee-apl/attachments/"
-        "indicateur_d_accessibilite_potentielle_localisee_apl_aux_infirmieres_xlsx/"
+        "indicateur_d_apl_aux_infirmiers_xlsx"
     ),
-    "apl_chirurgiens_dentistes.xlsx": (
-        "https://data.drees.solidarites-sante.gouv.fr/api/datasets/1.0/"
+    "chirurgiens_dentistes": (
+        "https://data.drees.solidarites-sante.gouv.fr/api/v2/catalog/datasets/"
         "530_l-accessibilite-potentielle-localisee-apl/attachments/"
-        "indicateur_d_accessibilite_potentielle_localisee_apl_aux_chirurgiens_dentistes_xlsx/"
+        "indicateur_d_apl_aux_chirurgiens_dentistes_xlsx"
     ),
 }
 
@@ -62,13 +74,21 @@ def telecharger(nom: str, url: str, output_dir: Path) -> bool:
         return False
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Télécharge les fichiers APL DREES pour un millésime.")
+    parser.add_argument("--annee", type=int, required=True, help="Millésime à télécharger, ex. 2024")
+    return parser.parse_args()
+
+
 def main():
-    output_dir = OUTPUT_DIR.resolve()
+    args = parse_args()
+    output_dir = (SOURCE_DIR / str(args.annee)).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Dossier de sortie : {output_dir}\n")
 
     succes = 0
-    for nom, url in FICHIERS.items():
+    for slug, url in FICHIERS.items():
+        nom = f"apl_{slug}_{args.annee}.xlsx"
         if telecharger(nom, url, output_dir):
             succes += 1
 

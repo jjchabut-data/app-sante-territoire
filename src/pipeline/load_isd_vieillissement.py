@@ -65,7 +65,7 @@ def load_file(file_path: Path) -> pd.DataFrame:
 
     # Supprimer les lignes sans code département (totaux, notes de bas de page)
     df = df.dropna(subset=["Unnamed: 0"])
-    df = df[df["Unnamed: 0"].str.match(r"^\d{2,3}$", na=False)]
+    df = df[df["Unnamed: 0"].str.match(r"^(\d{2,3}|2[AB])$", na=False)]
 
     log.info(f"{len(df)} départements chargés")
 
