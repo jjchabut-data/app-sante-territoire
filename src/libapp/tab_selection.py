@@ -31,11 +31,6 @@ def setup_sidebar(df_indic, ref) -> bool:
     types_autorises = DOM_TYP_TERRI.get(domaine, list(TYPES_TERRITOIRE.keys()))
     type_labels = {k: v for k, v in TYPES_TERRITOIRE.items() if k in types_autorises}
 
-    from libapp.config import DOMAINES
-    domaine_label = DOMAINES.get(domaine or "sante", "Santé")
-    st.sidebar.markdown(
-        f"<div style='font-size:0.75rem;color:gray;margin-bottom:2px;'>Domaine : <strong>{domaine_label}</strong></div>",
-        unsafe_allow_html=True)
     st.sidebar.markdown("---")
     st.sidebar.header("📍 Définir Territoire")
 

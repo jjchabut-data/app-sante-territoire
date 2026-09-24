@@ -1,0 +1,49 @@
+# Métadonnées d'affichage pour la page "Sources & millésimes".
+#
+# Ce fichier ne définit PAS la liste des sources suivies — cette liste vient
+# des colonnes millesime_* réellement présentes dans mart_meta_sources.parquet
+# (donc de dbt_project.yml, seule source de vérité). Ici, on ajoute juste un
+# nom lisible / une source / un dernier contrôle pour chaque colonne connue.
+# Une colonne millesime_* sans entrée ici s'affiche quand même (nom brut).
+#
+# À mettre à jour à la main à chaque vérification — voir docs/ChangementMillesime.md.
+
+millesime_apl:
+  donnee: "Accès aux soins (APL)"
+  source: DREES
+  controle: "23/09/2026 — à jour"
+
+millesime_geo:
+  donnee: "Découpage communal"
+  source: IGN
+  controle: "23/09/2026 — à jour"
+
+millesime_densite:
+  donnee: "Densité de population"
+  source: INSEE
+  controle: "23/09/2026 — à jour"
+
+millesime_pop_age:
+  donnee: "Population par tranche d'âge"
+  source: DREES
+  controle: "23/09/2026 — à jour"
+
+millesime_vieillissement:
+  donnee: "Vieillissement de la population"
+  source: DREES
+  controle: "23/09/2026 — à jour"
+
+millesime_mortalite:
+  donnee: "Mortalité"
+  source: DREES
+  controle: "23/09/2026 — à jour"
+
+millesime_esperance_vie:
+  donnee: "Espérance de vie"
+  source: DREES
+  controle: "23/09/2026 — à jour"
+
+millesime_urgences:
+  donnee: "Temps d'accès aux urgences"
+  source: DREES
+  controle: "23/09/2026 — à jour"
