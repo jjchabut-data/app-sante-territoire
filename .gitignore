@@ -9,4 +9,5 @@ __pycache__/
 config.yaml
 .python-version
 .streamlit/secrets.toml
-.claude/worktrees/
+**/.claude/worktrees/
+!notebooks/clustering_methodologie.ipynb

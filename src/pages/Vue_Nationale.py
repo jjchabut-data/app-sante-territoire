@@ -188,6 +188,7 @@ K-Means partitionne les communes en **5 groupes** en minimisant la variance intr
 | `apl_kines_std`       | APL kinésithérapeutes (z-score)                   |
 | `apl_sagefemmes_std`  | APL sages-femmes (z-score)                        |
 | `urbanite_score`      | Score de densité/urbanité                         |
+| `besoins_std`         | Mortalité prématurée du département (z-score inversé) |
 
 ---
 
@@ -200,4 +201,7 @@ K-Means partitionne les communes en **5 groupes** en minimisant la variance intr
 | 2       | APL moyen         | Proche de la moyenne|
 | 3       | APL bon           | Au-dessus de la moyenne |
 | 4       | Pôles de santé    | Le plus élevé       |
+
+Score APL d'un cluster : moyenne pondérée des 5 APL de son centre
+(médecins 0.35, infirmiers 0.25, kinés 0.20, dentistes 0.15, sages-femmes 0.05).
 """)
