@@ -29,6 +29,7 @@ IF_EXISTS  = "replace"
 FILES = {
     "2024": Path("../../data/raw/source/grille_densite_2025_geo_2024.xlsx"),
     "2025": Path("../../data/raw/source/grille_densite_2025_geo_2025.xlsx"),
+    "2026": Path("../../data/raw/source/grille_densite_2025_geo_2026.xlsx"),
 }
 
 MAILLES = {
